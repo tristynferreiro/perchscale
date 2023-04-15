@@ -11,9 +11,14 @@
 // const char* password = "ben";
 const char* ssid           = "Hornbill Net";
 const char* password       = "NULL";                    //set to null so it is an open network
-const int   channel        = 10;                        // WiFi Channel number between 1 and 13
-const bool  hide_SSID      = false;                     // To disable SSID broadcast -> SSID will not appear in a basic WiFi scan
-const int   max_connection = 2;                         // Maximum simultaneous connected clients on the AP
+// const int   channel        = 10;                        // WiFi Channel number between 1 and 13
+// const bool  hide_SSID      = false;                     // To disable SSID broadcast -> SSID will not appear in a basic WiFi scan
+// const int   max_connection = 2;                         // Maximum simultaneous connected clients on the AP
+
+// Customise the IP of the device.
+// IPAddress local_ip(192,168,0,1);
+// IPAddress gateway(192,168,0,1);
+// IPAddress subnet(255,255,255,0);
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -35,19 +40,19 @@ unsigned long previousTime = 0;
 const long timeoutTime = 2000;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(115200); // Set baud rate
   // Initialize the output variables as outputs
   pinMode(output4, OUTPUT);
   // Set outputs to LOW
   digitalWrite(output4, LOW);
 
   // Connect to Wi-Fi network with SSID and password
-  Serial.println("\n[*] Creating AP");
+  Serial.println("\n Hold onto your feathers..."); // Creating AP message
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
-  // Print local IP address 
-  Serial.print("[+] AP Created with IP Gateway ");
-  Serial.println(WiFi.softAPIP());
+  
+  Serial.print(" AP Created with IP Gateway "); // Print local IP address 
+  Serial.print(WiFi.softAPIP());
   //start web server
   server.begin();
 }

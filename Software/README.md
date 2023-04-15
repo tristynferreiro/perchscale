@@ -1,5 +1,5 @@
 # Steps for running the code
-## Running Arduino Code
+## Running Arduino Test Code
 - Start with the Test_Code.
 - Download Arduino IDE.
 - Follow the steps on "Installing the Esp32 Library" in this [tutorial](https://all3dp.com/2/esp32-cam-arduino-tutorial/)
@@ -10,5 +10,9 @@
     TXD     -> V0R
     RXD     -> V0T
   You will need another connector on the ID0 pin. When you want to **flash code** onto the ESP32 Cam you need to **connect ID0 to GND** on the ESP32.
+- open the [Test_Code]() project in the IDE and upload it to the ESP32. Then disconnect the ID0 -> GND cable
+- open the serial monitor and click the reset button on the ESP32.
+
+
     
     
