@@ -9,6 +9,6 @@
     GND     -> GND
     TXD     -> V0R
     RXD     -> V0T
-  You will need another connector on the ID0 pin. When you want to flash the ESP32 Cam 
+  You will need another connector on the ID0 pin. When you want to **flash code** onto the ESP32 Cam you need to **connect ID0 to GND** on the ESP32.
     
     
