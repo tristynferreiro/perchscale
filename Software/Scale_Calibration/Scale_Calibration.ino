@@ -1,3 +1,5 @@
+#include <HX711.h>
+
 /*
  Example using the SparkFun HX711 breakout board with a scale
  By: Nathan Seidle
