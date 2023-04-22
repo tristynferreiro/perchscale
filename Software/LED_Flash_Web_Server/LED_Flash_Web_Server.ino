@@ -46,7 +46,7 @@ void setup() {
   // Set outputs to LOW
   digitalWrite(output4, LOW);
 
-  // Connect to Wi-Fi network with SSID and password
+  // Create Wi-Fi network with SSID and password
   Serial.println("\n Hold onto your feathers..."); // Creating AP message
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
