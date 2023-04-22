@@ -1,50 +1,37 @@
 /*********
+  This program sets up an ESP32 access point and starts a basic webserver that allows you to press a button to toggle the
+  onboard LED on/off.
+  ***************************************  
+  Original Project:
   Rui Santos
   Complete project details at https://randomnerdtutorials.com  
 *********/
+
 
 // Load Wi-Fi library
 #include <WiFi.h>
 #include <WebServer.h>
 
-// Replace with your network credentials
-// const char* ssid = "Hornbill Net";
-// const char* password = "ben";
-
+// Replace with your network credentialss
 const char* ssid           = "Hornbill Net";
 const char* password       = NULL;                    //set to null so it is an open network
-// const int   channel        = 10;                        // WiFi Channel number between 1 and 13
-// const bool  hide_SSID      = false;                     // To disable SSID broadcast -> SSID will not appear in a basic WiFi scan
-// const int   max_connection = 2;                         // Maximum simultaneous connected clients on the AP
-
-// Customise the IP of the device.
-// IPAddress local_ip(192,168,0,1);
-// IPAddress gateway(192,168,0,1);
-// IPAddress subnet(255,255,255,0);
+// const int   channel        = 10;                   // WiFi Channel number between 1 and 13
+// const bool  hide_SSID      = false;                // To disable SSID broadcast -> SSID will not appear in a basic WiFi scan
+// const int   max_connection = 2;                    // Maximum simultaneous connected clients on the AP 
 
 // Set web server port number to 80
 WiFiServer server(80);
+String header; // Variable to store the HTTP request
+String output4State = "off"; // Auxiliar variables to store the current output state of LED on Cam board
+const int output4 = 4; // Assign output variables to GPIO pins
 
-// Variable to store the HTTP request
-String header;
-
-// Auxiliar variables to store the current output state of LED on Cam board
-String output4State = "off";
-
-// Assign output variables to GPIO pins
-const int output4 = 4;
-
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0; 
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
+// Variables for connection testing
+unsigned long currentTime = millis(); // Current time
+unsigned long previousTime = 0;  // Previous time
+const long timeoutTime = 2000; // Define timeout time in milliseconds (example: 2000ms = 2s)
 
 void setup() {
-  Serial.begin(115200); // Set baud rate
-  //String hname = "Hornbill Net";
-  //WiFi.setHostname(hname.c_str());
+  Serial.begin(115200); // Set baud rate;
   // Initialize the output variables as output
   pinMode(output4, OUTPUT);
   // Set outputs to LOW

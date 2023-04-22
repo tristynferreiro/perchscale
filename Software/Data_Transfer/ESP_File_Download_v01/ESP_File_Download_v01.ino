@@ -38,6 +38,10 @@
 #include <SD.h> 
 #include <SPI.h>
 
+// Replace with your network credentialss
+const char* ssid           = "Hornbill Net";
+const char* password       = NULL;                    //set to null so it is an open network
+
 // Set web server port number to 80
 WiFiServer server(80);
 
