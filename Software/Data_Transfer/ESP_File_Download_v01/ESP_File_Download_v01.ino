@@ -29,11 +29,13 @@
 #include "CSS.h"
 #include "SD.h" 
 #include <SPI.h>
+#include "SD_MMC.h"
 
 // Replace with your network credentialss
 const char* ssid           = "Hornbill Net";
 const char* password       = NULL;                    //set to null so it is an open network
 
+//SD_CS_Pin = 14;
 // Set web server port number to 80
 WebServer server(80);
 
@@ -52,21 +54,33 @@ void setup(void){
   Serial.print(" AP Created with IP Gateway "); // Print local IP address 
   Serial.print(WiFi.softAPIP());
 
-  #ifdef ESP32
-    // Note: SD_Card readers on the ESP32 will NOT work unless there is a pull-up on MISO, either do this or wire one on (1K to 4K7)
-    Serial.println(MISO);
-    pinMode(19,INPUT_PULLUP);
-  #endif
-  Serial.print(F("Initializing SD card...")); 
-  if (!SD.begin(SD_CS_pin)) { // see if the card is present and can be initialised. Wemos SD-Card CS uses D8 
-    Serial.println(F("Card failed or not present, no SD Card data logging possible..."));
-    SD_present = false; 
-  } 
-  else
-  {
-    Serial.println(F("Card initialised... file access enabled..."));
-    SD_present = true; 
-  }
+  // #ifdef ESP32
+  //   // Note: SD_Card readers on the ESP32 will NOT work unless there is a pull-up on MISO, either do this or wire one on (1K to 4K7)
+  //   Serial.println(MISO);
+  //   pinMode(19,INPUT_PULLUP);
+  // #endif
+  // Serial.print(F("Initializing SD card...")); 
+  // if (!SD.begin(SD_CS_pin)) { // see if the card is present and can be initialised. Wemos SD-Card CS uses D8 
+  //   Serial.println(F("Card failed or not present, no SD Card data logging possible..."));
+  //   SD_present = false; 
+  // } 
+  // else
+  // {
+  //   Serial.println(F("Card initialised... file access enabled..."));
+  //   SD_present = true; 
+  // }
+
+  //Serial.println("Starting SD Card");
+if(!SD_MMC.begin()){
+  Serial.println("SD Card Mount Failed");
+  return;
+}
+ 
+cardType = SD_MMC.cardType();
+// if(cardType == CARD_NONE){
+//   Serial.println("No SD Card attached");
+//   return;
+// }
   // Note: Using the ESP32 and SD_Card readers requires a 1K to 4K7 pull-up to 3v3 on the MISO line, otherwise they do-not function.
   //----------------------------------------------------------------------   
   ///////////////////////////// Server Commands 
