@@ -5,13 +5,14 @@
 
 // Load Wi-Fi library
 #include <WiFi.h>
+#include <WebServer.h>
 
 // Replace with your network credentials
 // const char* ssid = "Hornbill Net";
 // const char* password = "ben";
 
 const char* ssid           = "Hornbill Net";
-const char* password       = "NULL";                    //set to null so it is an open network
+const char* password       = NULL;                    //set to null so it is an open network
 // const int   channel        = 10;                        // WiFi Channel number between 1 and 13
 // const bool  hide_SSID      = false;                     // To disable SSID broadcast -> SSID will not appear in a basic WiFi scan
 // const int   max_connection = 2;                         // Maximum simultaneous connected clients on the AP
@@ -42,8 +43,8 @@ const long timeoutTime = 2000;
 
 void setup() {
   Serial.begin(115200); // Set baud rate
-  String hname = "Hornbill Net";
-  WiFi.setHostname(hname.c_str());
+  //String hname = "Hornbill Net";
+  //WiFi.setHostname(hname.c_str());
   // Initialize the output variables as output
   pinMode(output4, OUTPUT);
   // Set outputs to LOW
