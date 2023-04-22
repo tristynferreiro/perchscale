@@ -20,22 +20,14 @@
  See more at http://www.dsbird.org.uk
  *
 */
-#ifdef ESP8266
-  #include <ESP8266WiFi.h>       // Built-in
-  #include <ESP8266WiFiMulti.h>  // Built-in
-  #include <ESP8266WebServer.h>  // Built-in
-  #include <ESP8266mDNS.h>
-#else
-  #include <WiFi.h>              // Built-in
-  // #include <ESP32WebServer.h>    // https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
-  #include <ESPmDNS.h>
-  #include "FS.h"
-#endif
+// Load Wi-Fi library
+#include <WiFi.h>
+#include <WebServer.h>
 
 #include "Network.h"
 #include "Sys_Variables.h"
 #include "CSS.h"
-#include <SD.h> 
+#include "SD.h" 
 #include <SPI.h>
 
 // Replace with your network credentialss
@@ -43,15 +35,15 @@ const char* ssid           = "Hornbill Net";
 const char* password       = NULL;                    //set to null so it is an open network
 
 // Set web server port number to 80
-WiFiServer server(80);
+WebServer server(80);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void setup(void){
   Serial.begin(115200); // Set baud rate
   // Initialize the output variables as outputs
-  pinMode(output4, OUTPUT);
+//  pinMode(output4, OUTPUT);
   // Set outputs to LOW
-  digitalWrite(output4, LOW);
+  //digitalWrite(output4, LOW);
 
   // Connect to Wi-Fi network with SSID and password
   Serial.println("\n Hold onto your feathers..."); // Creating AP message
