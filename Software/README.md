@@ -13,6 +13,11 @@
 - open the [Test_Code]() project in the IDE and upload it to the ESP32. Then disconnect the ID0 -> GND cable
 - open the serial monitor and click the reset button on the ESP32.
 
+IMPORTANT!!! 
+   - Select Board "AI Thinker ESP32-CAM"
+   - GPIO 0 must be connected to GND to upload a sketch
+   - After connecting GPIO 0 to GND, press the ESP32-CAM on-board RESET button to put your board in flashing mode
+
 
     
     
