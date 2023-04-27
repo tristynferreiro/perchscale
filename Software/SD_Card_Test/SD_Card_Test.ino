@@ -37,9 +37,9 @@ void setup() {
   //SD_MMC.remove("/Test/test_write.txt"); // delete the file if existed
 
   // Define the file path
-  String path = "/Test/test_write.txt";
+  String path = "/test_write.txt";
   fs::FS &fs = SD_MMC; 
-  Serial.printf("Writing to file: %s\n", path.c_str());
+  Serial.printf("Opening file: %s\n", path.c_str());
 
   File file = fs.open(path.c_str(), FILE_WRITE); // create/open file to write to
   
