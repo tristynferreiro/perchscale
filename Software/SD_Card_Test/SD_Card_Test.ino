@@ -15,7 +15,7 @@ char buf[] = "Hello Ben";
 
 void setup() {
  
-  Serial.begin(115200);
+  Serial.begin(9600);
   //Serial.setDebugOutput(true);
   //Serial.println();
   

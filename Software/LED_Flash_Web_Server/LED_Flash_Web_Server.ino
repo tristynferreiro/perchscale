@@ -33,9 +33,9 @@ unsigned long previousTime = 0;  // Previous time
 const long timeoutTime = 2000; // Define timeout time in milliseconds (example: 2000ms = 2s)
 
 void setup() {
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Turn-off the 'brownout detector'
+  //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Turn-off the 'brownout detector'
 
-  Serial.begin(115200); // Set baud rate;
+  Serial.begin(9600); // Set baud rate;
   // Initialize the output variables as output
   pinMode(output4, OUTPUT);
   // Set outputs to LOW

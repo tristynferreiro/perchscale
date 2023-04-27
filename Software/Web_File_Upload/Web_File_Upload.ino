@@ -39,24 +39,13 @@
 // Replace with your network credentialss
 const char* ssid           = "Hornbill Net";
 const char* password       = NULL;                    //set to null so it is an open network
-
+//bool SD_present;
 WebServer server(80);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void setup(void){
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Turn-off the 'brownout detector'
-  
-  Serial.begin(115200);
-
-  // Create Wi-Fi network with SSID and password
-  Serial.println("\n Hold onto your feathers..."); // Creating AP message
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
-  
-  Serial.print(" AP Created with IP Gateway "); // Print local IP address 
-  Serial.print(WiFi.softAPIP());
-  //start web server
-  server.begin();
+  Serial.begin(9600);
 
   // if (!WiFi.config(local_IP, gateway, subnet, dns)) { //WiFi.config(ip, gateway, subnet, dns1, dns2);
   //   Serial.println("WiFi STATION Failed to configure Correctly"); 
@@ -72,10 +61,10 @@ void setup(void){
   // }
   // Serial.println("\nConnected to "+WiFi.SSID()+" Use IP address: "+WiFi.localIP().toString()); // Report which SSID and IP is in use
   // // The logical name http://fileserver.local will also access the device if you have 'Bonjour' running or your system supports multicast dns
-  if (!MDNS.begin(servername)) {          // Set your preferred server name, if you use "myserver" the address would be http://myserver.local/
-    Serial.println(F("Error setting up MDNS responder!")); 
-    ESP.restart(); 
-  } 
+  // if (!MDNS.begin(servername)) {          // Set your preferred server name, if you use "myserver" the address would be http://myserver.local/
+  //   Serial.println(F("Error setting up MDNS responder!")); 
+  //   ESP.restart(); 
+  // } 
   
   Serial.print(F("Initializing SD card...")); 
   // if (!SD.begin(SD_CS_pin)) { // see if the card is present and can be initialised. Wemos SD-Card CS uses D8 
@@ -90,12 +79,26 @@ void setup(void){
   if(!SD_MMC.begin()){
     Serial.println("SD Card Mount Failed, please insert SD Card");
     return;
+  }else{
+    Serial.println("SD Card Mounted Successfully");
+    SD_present = true; 
   }
   uint8_t cardType = SD_MMC.cardType();
   if(cardType == CARD_NONE){
     Serial.println("No SD Card attached");
     return;
   }
+  
+
+  // Create Wi-Fi network with SSID and password
+  Serial.println("\n Hold onto your feathers..."); // Creating AP message
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  
+  Serial.print(" AP Created with IP Gateway "); // Print local IP address 
+  Serial.print(WiFi.softAPIP());
+  //start web server
+  server.begin();
   // Note: Using the ESP32 and SD_Card readers requires a 1K to 4K7 pull-up to 3v3 on the MISO line, otherwise they do-not function.
   //----------------------------------------------------------------------   
   ///////////////////////////// Server Commands 
