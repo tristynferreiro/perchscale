@@ -21,7 +21,7 @@
  *
 */
 
-#include <WiFi.h>              // Built-in
+#include <WiFi.h>              
 #include <WebServer.h>   
 #include <ESPmDNS.h>
 #include "FS.h"                // SD Card ESP32
@@ -29,92 +29,62 @@
 #include "soc/soc.h"           // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"  // Disable brownout problems
 #include "driver/rtc_io.h"
+#include <SPI.h>
 
 #include "Network.h"
 #include "Sys_Variables.h"
 #include "CSS.h"
-// #include <SD.h> 
-#include <SPI.h>
 
-// Replace with your network credentialss
+// Set network credentials
 const char* ssid           = "Hornbill Net";
 const char* password       = NULL;                    //set to null so it is an open network
-//bool SD_present;
-WebServer server(80);
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+WebServer server(80); // Set Webserver host port
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void setup(void){
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Turn-off the 'brownout detector'
-  Serial.begin(9600);
+  
+  Serial.begin(9600); // Set the baud rate
 
-  // if (!WiFi.config(local_IP, gateway, subnet, dns)) { //WiFi.config(ip, gateway, subnet, dns1, dns2);
-  //   Serial.println("WiFi STATION Failed to configure Correctly"); 
-  // } 
-  // wifiMulti.addAP(ssid_1, password_1);  // add Wi-Fi networks you want to connect to, it connects strongest to weakest
-  // wifiMulti.addAP(ssid_2, password_2);  // Adjust the values in the Network tab
-  // wifiMulti.addAP(ssid_3, password_3);
-  // wifiMulti.addAP(ssid_4, password_4);  // You don't need 4 entries, this is for example!
-  
-  // Serial.println("Connecting ...");
-  // while (wifiMulti.run() != WL_CONNECTED) { // Wait for the Wi-Fi to connect: scan for Wi-Fi networks, and connect to the strongest of the networks above
-  //   delay(250); Serial.print('.');
-  // }
-  // Serial.println("\nConnected to "+WiFi.SSID()+" Use IP address: "+WiFi.localIP().toString()); // Report which SSID and IP is in use
-  // // The logical name http://fileserver.local will also access the device if you have 'Bonjour' running or your system supports multicast dns
-  // if (!MDNS.begin(servername)) {          // Set your preferred server name, if you use "myserver" the address would be http://myserver.local/
-  //   Serial.println(F("Error setting up MDNS responder!")); 
-  //   ESP.restart(); 
-  // } 
-  
+  // ------------------------ SD Card Initialisation --------------------------------
   Serial.print(F("Initializing SD card...")); 
-  // if (!SD.begin(SD_CS_pin)) { // see if the card is present and can be initialised. Wemos SD-Card CS uses D8 
-  //   Serial.println(F("Card failed or not present, no SD Card data logging possible..."));
-  //   SD_present = false; 
-  // } 
-  // else
-  // {
-  //   Serial.println(F("Card initialised... file access enabled..."));
-  //   SD_present = true; 
-  // }
   if(!SD_MMC.begin()){
-    Serial.println("SD Card Mount Failed, please insert SD Card");
+    Serial.println("\n SD Card Mount Failed, please insert SD Card");
     return;
   }else{
-    Serial.println("SD Card Mounted Successfully");
+    Serial.println("\n SD Card Mounted Successfully");
     SD_present = true; 
   }
+
   uint8_t cardType = SD_MMC.cardType();
   if(cardType == CARD_NONE){
-    Serial.println("No SD Card attached");
+    Serial.println("\n No SD Card attached");
     return;
   }
   
-
+  // ------------------------ Wifi AP setup --------------------------------------
   // Create Wi-Fi network with SSID and password
   Serial.println("\n Hold onto your feathers..."); // Creating AP message
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
   
-  Serial.print(" AP Created with IP Gateway "); // Print local IP address 
+  Serial.print("\n AP Created with IP Gateway "); // Print local IP address 
   Serial.print(WiFi.softAPIP());
-  //start web server
-  server.begin();
-  // Note: Using the ESP32 and SD_Card readers requires a 1K to 4K7 pull-up to 3v3 on the MISO line, otherwise they do-not function.
-  //----------------------------------------------------------------------   
-  ///////////////////////////// Server Commands 
+
+  //-------------------------- Web Server Commands -------------------------------    
   server.on("/",         HomePage);
   server.on("/download", File_Download);
-  ///////////////////////////// End of Request commands
-  server.begin();
-  Serial.println("HTTP server started");
+  
+  server.begin(); //start web server
+  Serial.println("\n Web server started");
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void loop(void){
   server.handleClient(); // Listen for client connections
 }
 
-// All supporting functions from here...
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Supporting Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void HomePage(){
   SendHTML_Header();
   webpage += F("<a href='/download'><button>Download</button></a>");
@@ -122,14 +92,14 @@ void HomePage(){
   SendHTML_Content();
   SendHTML_Stop(); // Stop is needed because no content length was sent
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void File_Download(){ // This gets called twice, the first pass selects the input, the second pass then processes the command line arguments
   if (server.args() > 0 ) { // Arguments were received
     if (server.hasArg("download")) SD_file_download(server.arg(0));
   }
   else SelectInput("File Download","Enter filename to download","download","download");
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void SD_file_download(String filename){
   if (SD_present) { 
     File download = SD_MMC.open("/"+filename);
@@ -142,7 +112,7 @@ void SD_file_download(String filename){
     } else ReportFileNotPresent("download"); 
   } else ReportSDNotPresent();
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void SendHTML_Header(){
   server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate"); 
   server.sendHeader("Pragma", "no-cache"); 
@@ -153,17 +123,17 @@ void SendHTML_Header(){
   server.sendContent(webpage);
   webpage = "";
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void SendHTML_Content(){
   server.sendContent(webpage);
   webpage = "";
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void SendHTML_Stop(){
   server.sendContent("");
   server.client().stop(); // Stop is needed because no content length was sent
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void SelectInput(String heading1, String heading2, String command, String arg_calling_name){
   SendHTML_Header();
   webpage += F("<h3 class='rcorners_m'>");webpage += heading1+"</h3><br>";
@@ -175,7 +145,7 @@ void SelectInput(String heading1, String heading2, String command, String arg_ca
   SendHTML_Content();
   SendHTML_Stop();
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void ReportSDNotPresent(){
   SendHTML_Header();
   webpage += F("<h3>No SD Card present</h3>"); 
@@ -184,7 +154,7 @@ void ReportSDNotPresent(){
   SendHTML_Content();
   SendHTML_Stop();
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//------------------------------------------------------------------------------------
 void ReportFileNotPresent(String target){
   SendHTML_Header();
   webpage += F("<h3>File does not exist</h3>"); 
