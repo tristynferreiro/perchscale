@@ -46,5 +46,5 @@ void loop() {
     file.close();
 
   }
-  delay(1500);
+  //delay(1500);
 }
