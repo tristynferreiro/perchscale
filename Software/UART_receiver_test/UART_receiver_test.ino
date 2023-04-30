@@ -8,18 +8,24 @@
 HardwareSerial SerialPort(2); // use UART2 
 
 void setup() {
-  Serial.begin(9600); //Communicates with ESP32Cam
+  Serial.begin(9600); //Communicates with PC
 
-  SerialPort.begin(115200,SERIAL_8N1, 16, 17); // Communicates to PC what it is getting from Cam
+  SerialPort.begin(9600,SERIAL_8N1, 16, 17); //Communicates with ESP32Cam
   pinMode(2, OUTPUT); // to allow onboard LED to be toggled
 }
 
 void loop() {
-  String data = "failed";
-  if (Serial.available()) 
+  
+  if (SerialPort.available()) 
   {
-    data = Serial.readString();
+    String data = SerialPort.readString();
     digitalWrite(2, HIGH); // toggle LED to show data being recieved
+    Serial.println(data);
+    
+  }else{
+    Serial.println("nothing");
   }
-  SerialPort.print(data);
+  delay(1500);
+  digitalWrite(2, LOW); // toggle LED off
+  
 }
