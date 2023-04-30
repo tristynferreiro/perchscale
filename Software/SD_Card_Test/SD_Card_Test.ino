@@ -4,22 +4,18 @@
   Used Rui Santos' project to get an idea on how to write to the SD card. Their complete project details at https://RandomNerdTutorials.com/esp32-cam-take-photo-save-microsd-card
 *********/
 
-#include "Arduino.h"
 #include "FS.h"                // SD Card ESP32
 #include "SD_MMC.h"            // SD Card ESP32
 #include "soc/soc.h"           // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"  // Disable brownout problems
 #include "driver/rtc_io.h"
 
-char buf[] = "Hello Ben";
+String buf = "Hello Ben";
 
 void setup() {
- 
-  Serial.begin(9600);
-  //Serial.setDebugOutput(true);
-  //Serial.println();
+  Serial.begin(9600); // Set the Baud rate
   
-   /***************** Mount SD Card *****************************/
+  //--------------------------- Mount SD Card ---------------------------/
   Serial.println("Starting SD Card");
   if(!SD_MMC.begin()){
     Serial.println("SD Card Mount Failed, please insert SD Card");
@@ -31,8 +27,7 @@ void setup() {
     return;
   }
 
-
-  /***************** Read or Write to data files *****************************/
+  //----------------------- Read or Write to data files ---------------------------/
   
   //SD_MMC.remove("/Test/test_write.txt"); // delete the file if existed
 
@@ -52,7 +47,7 @@ void setup() {
   }
   file.close();
 
-   /***************** Put ESP32 to sleep *****************************/
+  //----------------------- Put ESP32 to sleep ---------------------------/
   delay(2000);
   Serial.println("Going to sleep now");
   delay(2000);
