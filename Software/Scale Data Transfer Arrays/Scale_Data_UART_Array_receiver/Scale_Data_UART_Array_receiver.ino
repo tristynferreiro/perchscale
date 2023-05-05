@@ -11,6 +11,7 @@
 String data_arr[1000];
 int counter = 0;
 int fileCounter = 0;
+bool done = false;
 void setup() {
   Serial.begin(9600); // Set Baud Rate to communicate with ESP32Dev
 
@@ -31,11 +32,15 @@ void loop() {
   if (Serial.available()) 
   {
     String data = Serial.readString();
-    float dataFloat = data.toFloat();
+    int dataFloat = data.toInt();
     if(dataFloat>80 and counter<1000){
       data_arr[counter] = data; // add to array
       counter = counter +1;
-    }else {
+    }else{
+      done = true;
+    }
+  } 
+  if(done) {
       //----------------------- Write to data files ---------------------------//
       // Define the file path
       String path = "/dataset_";
@@ -45,7 +50,7 @@ void loop() {
       fs::FS &fs = SD_MMC; 
       // Serial.printf("Opening file: %s\n", path.c_str());
 
-      File file = fs.open(path.c_str(), FILE_WRITE); // open file to write to
+      File file = fs.open(path.c_str(), FILE_APPEND); // open file to write to
       
       if(!file){
         // Serial.println("Failed to open file in writing mode");
@@ -61,7 +66,7 @@ void loop() {
       
       fileCounter = fileCounter+1;
       counter = 0;
+      done = false;
     }
-  }
   //delay(1500);
 }
