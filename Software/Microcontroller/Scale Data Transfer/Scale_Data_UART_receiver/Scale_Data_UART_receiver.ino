@@ -8,9 +8,12 @@
 #include "soc/rtc_cntl_reg.h"  // Disable brownout problems
 #include "driver/rtc_io.h"
 
+File file;
 void setup() {
   Serial.begin(9600); // Set Baud Rate to communicate with ESP32Dev
-
+  //while(!Serial.available()){
+    //wait for connection
+  //}
   //--------------------------- Mount SD Card ---------------------------/
   // Serial.println("Starting SD Card");
   if(!SD_MMC.begin()){
@@ -34,7 +37,7 @@ void loop() {
     fs::FS &fs = SD_MMC; 
     // Serial.printf("Opening file: %s\n", path.c_str());
 
-    File file = fs.open(path.c_str(), FILE_APPEND); // open file to write to
+    file = fs.open(path.c_str(), FILE_APPEND); // open file to write to
     
     if(!file){
       // Serial.println("Failed to open file in writing mode");
