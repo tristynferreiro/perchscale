@@ -7,14 +7,11 @@
 #include "soc/soc.h"           // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"  // Disable brownout problems
 #include "driver/rtc_io.h"
-File file;
 uint16_t deelay = 500;
 // Array scale stuff
 // String data_arr[1000];
-int counter = 0;
-// int fileCounter = 0;
+int fileCounter = 0;
 // bool done = false;
-
 void setup() {
   Serial.begin(9600); // Set Baud Rate to communicate with ESP32Dev
   while (!Serial) {
@@ -32,6 +29,7 @@ void setup() {
     // Serial.println("No SD Card attached");
     return;
   }
+  
 
 }
 
@@ -40,22 +38,31 @@ void loop() {
   {
     String data = Serial.readString();
     //----------------------- Read or Write to data files ---------------------------/
+    String path = "/dataset_";
+    path.concat(fileCounter);
+    path.concat(".txt");
     // Define the file path
-    String path = "/test_scale.txt";
     fs::FS &fs = SD_MMC; 
-    // Serial.printf("Opening file: %s\n", path.c_str());
-    file = fs.open(path.c_str(), FILE_APPEND); // open file to write to
-    
+    File file = fs.open(path.c_str(), FILE_APPEND); // open file to write to
+
     if(file){
-      file.println(counter); // write to the file
-      file.println(data); // write to the file
+      file.print(data); // write to the file
+      file.close();
+      // if(data.equals("done")){
+      //   fileCounter = fileCounter + 1;
+      // } else{
+      //   file.println(fileCounter);
+      //   file.print(",");
+      //   file.print(data); // write to the file
+      //   file.close();
+       
+      }
+      
       // Serial.printf("Saved file to path: %s\n", path.c_str());
     }
     
-  }
-  counter = counter +1;
-  file.println(counter); // write to the file
-  file.close();
+  
+  
   // if(done){
   //     //-----------------------\Write to data files ---------------------------/
   //     // Define the file path
