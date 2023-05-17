@@ -11,6 +11,8 @@
 #include <HardwareSerial.h> // to setup UART for comm with ESP32Cam
 HardwareSerial SerialPort(2);// initialize UART2
 
+#define eigthseconds() (millis()/125)
+
 //pins:
 const int HX711_dout = 32; // D32 mcu > HX711 dout pin 
 const int HX711_sck = 33; // D33 mcu > HX711 sck pin
@@ -60,7 +62,7 @@ void loop() {
   if (newDataReady) {
     if (millis() > t + serialPrintInterval) {
       float i = LoadCell.getData();
-      if(i<80 & millis()%100 == 0){ //Condition to set new tare every 100 milliseconds
+      if(i<80 & eigthseconds()%80 == 0){ //Condition to set new tare every 1000 milliseconds
         boolean _resume = false;
         boolean _tarewait = true;
         while (_resume == false) {
@@ -83,7 +85,7 @@ void loop() {
           send = false;
         }
       }
-      else if (i>80){ //If a bird or heavy object is detected on the scale
+      else if (i>80 && count < 100){ //If a bird or heavy object is detected on the scale
           Serial.print("Load_cell output val: ");
           Serial.println(i);
 
@@ -94,6 +96,7 @@ void loop() {
           t = millis();
           scaleReadings[count] = i;
           count++;
+          //Serial.println(eigthseconds());
           send = true;
       }
       else{ 
