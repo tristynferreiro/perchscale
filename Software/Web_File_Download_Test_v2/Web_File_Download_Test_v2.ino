@@ -75,7 +75,7 @@ void setup(void){
   //-------------------------- Web Server Commands -------------------------------    
   server.on("/",         HomePage);
   server.on("/download", File_Download);
-  
+  server.on("/dir", Directory);
   server.begin(); //start web server
   Serial.println("\n Web server started");
 }
@@ -92,6 +92,7 @@ void HomePage(){
   SendHTML_Content();
   SendHTML_Stop(); // Stop is needed because no content length was sent
 }
+//-----------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------
 void File_Download(){ // This gets called twice, the first pass selects the input, the second pass then processes the command line arguments
   if (server.args() > 0 ) { // Arguments were received
