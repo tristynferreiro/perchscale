@@ -88,7 +88,6 @@ void loop(void){
 void HomePage(){
   SendHTML_Header();
   webpage += F("<a href='/download'><button>Download</button></a>");
-  append_page_footer();
   SendHTML_Content();
   SendHTML_Stop(); // Stop is needed because no content length was sent
 }
@@ -141,7 +140,6 @@ void SelectInput(String heading1, String heading2, String command, String arg_ca
   webpage += F("<FORM action='/"); webpage += command + "' method='post'>"; // Must match the calling argument e.g. '/chart' calls '/chart' after selection but with arguments!
   webpage += F("<input type='text' name='"); webpage += arg_calling_name; webpage += F("' value=''><br>");
   webpage += F("<type='submit' name='"); webpage += arg_calling_name; webpage += F("' value=''><br><br>");
-  append_page_footer();
   SendHTML_Content();
   SendHTML_Stop();
 }
@@ -150,7 +148,6 @@ void ReportSDNotPresent(){
   SendHTML_Header();
   webpage += F("<h3>No SD Card present</h3>"); 
   webpage += F("<a href='/'>[Back]</a><br><br>");
-  append_page_footer();
   SendHTML_Content();
   SendHTML_Stop();
 }
@@ -159,7 +156,6 @@ void ReportFileNotPresent(String target){
   SendHTML_Header();
   webpage += F("<h3>File does not exist</h3>"); 
   webpage += F("<a href='/"); webpage += target + "'>[Back]</a><br><br>";
-  append_page_footer();
   SendHTML_Content();
   SendHTML_Stop();
 }

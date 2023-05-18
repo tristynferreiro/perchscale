@@ -1,7 +1,7 @@
 void append_page_header() {
   webpage  = F("<!DOCTYPE html><html>");
   webpage += F("<head>");
-  webpage += F("<title>File Server</title>"); // NOTE: 1em = 16px
+  webpage += F("<title>Feather Web</title>"); // NOTE: 1em = 16px
   webpage += F("<meta name='viewport' content='user-scalable=yes,initial-scale=1.0,width=device-width'>");
   webpage += F("<style>");
   webpage += F("body{max-width:65%;margin:0 auto;font-family:arial;font-size:105%;text-align:center;color:blue;background-color:#F7F2Fd;}");
@@ -22,23 +22,23 @@ void append_page_header() {
   webpage += F(".column{float:left;width:50%;height:45%;}");
   webpage += F(".row:after{content:'';display:table;clear:both;}");
   webpage += F("*{box-sizing:border-box;}");
-  webpage += F("footer{background-color:#eedfff; text-align:center;padding:0.3em 0.3em;border-radius:0.375em;font-size:60%;}");
+  // webpage += F("footer{background-color:#eedfff; text-align:center;padding:0.3em 0.3em;border-radius:0.375em;font-size:60%;}");
   webpage += F("button{border-radius:0.5em;background:#558ED5;padding:0.3em 0.3em;width:20%;color:white;font-size:130%;}");
   webpage += F(".buttonsm{border-radius:0.5em;background:#558ED5;padding:0.3em 0.3em;width:9%; color:white;font-size:70%;}");
   webpage += F(".buttonm {border-radius:0.5em;background:#558ED5;padding:0.3em 0.3em;width:15%;color:white;font-size:70%;}");
   webpage += F(".buttonw {border-radius:0.5em;background:#558ED5;padding:0.3em 0.3em;width:40%;color:white;font-size:70%;}");
   webpage += F("a{font-size:75%;}");
   webpage += F("p{font-size:75%;}");
-  webpage += F("</style></head><body><h1>File Server "); webpage += String(ServerVersion) + "</h1>";
+  webpage += F("</style></head><body><h1>Feather Web</h1>");
 }
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void append_page_footer(){ // Saves repeating many lines of code for HTML page footers
-  webpage += F("<ul>");
-  webpage += F("<li><a href='/'>Home</a></li>"); // Lower Menu bar command entries
-  webpage += F("<li><a href='/download'>Download</a></li>"); 
-  webpage += F("</ul>");
-  webpage += "<footer>&copy;"+String(char(byte(0x40>>1)))+String(char(byte(0x88>>1)))+String(char(byte(0x5c>>1)))+String(char(byte(0x98>>1)))+String(char(byte(0x5c>>1)));
-  webpage += String(char((0x84>>1)))+String(char(byte(0xd2>>1)))+String(char(0xe4>>1))+String(char(0xc8>>1))+String(char(byte(0x40>>1)));
-  webpage += String(char(byte(0x64/2)))+String(char(byte(0x60>>1)))+String(char(byte(0x62>>1)))+String(char(0x70>>1))+"</footer>";
-  webpage += F("</body></html>");
-}
+// //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// void append_page_footer(){ // Saves repeating many lines of code for HTML page footers
+//   webpage += F("<ul>");
+//   webpage += F("<li><a href='/'>Home</a></li>"); // Lower Menu bar command entries
+//   webpage += F("<li><a href='/download'>Download</a></li>"); 
+//   webpage += F("</ul>");
+//   webpage += "<footer>&copy;"+String(char(byte(0x40>>1)))+String(char(byte(0x88>>1)))+String(char(byte(0x5c>>1)))+String(char(byte(0x98>>1)))+String(char(byte(0x5c>>1)));
+//   webpage += String(char((0x84>>1)))+String(char(byte(0xd2>>1)))+String(char(0xe4>>1))+String(char(0xc8>>1))+String(char(byte(0x40>>1)));
+//   webpage += String(char(byte(0x64/2)))+String(char(byte(0x60>>1)))+String(char(byte(0x62>>1)))+String(char(0x70>>1))+"</footer>";
+//   webpage += F("</body></html>");
+// }
