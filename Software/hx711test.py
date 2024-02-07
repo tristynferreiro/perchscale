@@ -16,5 +16,5 @@ while True:
 	#time.sleep(2)
 
 
-def calibrate():
+
 	
