@@ -61,8 +61,8 @@ for P0 in P0_range:
 P0_opt, Q_opt, R_opt = best_params
 predicted_values_opt = kalman_filter(x_hat,P0_opt, Q_opt, R_opt)
 
-# with open('filterParams.txt', 'a') as file:
-#         file.write(best_params)
+with open('filterParams.txt', 'w') as file:
+        file.write(str(P0_opt)+'\n'+str(Q_opt)+'\n'+str(R_opt)+'\n')
 
 # Plot the data and predicted values
 plt.plot(range(len(measurements)), measurements, label='Measurements')
@@ -74,10 +74,10 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-print("Optimal Parameters:")
-print("P0 =", P0_opt)
-print("Q =", Q_opt)
-print("R =", R_opt)
+# print("Optimal Parameters:")
+# print("P0 =", P0_opt)
+# print("Q =", Q_opt)
+# print("R =", R_opt)
 
 
 
