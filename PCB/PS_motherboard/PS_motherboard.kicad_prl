@@ -64,8 +64,14 @@
       39,
       40
     ],
-    "visible_layers": "ffffdbf_ffffffff",
+    "visible_layers": "ffffdff_ffffffff",
     "zone_display_mode": 0
+  },
+  "git": {
+    "repo_password": "",
+    "repo_type": "",
+    "repo_username": "",
+    "ssh_key": ""
   },
   "meta": {
     "filename": "PS_motherboard.kicad_prl",

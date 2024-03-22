@@ -8,4 +8,5 @@
   (lib (name "lib")(type "KiCad")(uri "${KIPRJMOD}/Additional Libraries/lib.pretty")(options "")(descr ""))
   (lib (name "UCT")(type "KiCad")(uri "${KIPRJMOD}/Additional Libraries/uct_kicad_library/footprints")(options "")(descr ""))
   (lib (name "Downloads")(type "KiCad")(uri "C:/Users/monts/Downloads")(options "")(descr ""))
+  (lib (name "SW_TD")(type "KiCad")(uri "${KIPRJMOD}/Additional Libraries/SW_TD.pretty")(options "")(descr ""))
 )

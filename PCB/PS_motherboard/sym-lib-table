@@ -5,4 +5,5 @@
   (lib (name "AD7730")(type "Legacy")(uri "${KIPRJMOD}/Additional Libraries/AD7730/AD7730.lib")(options "")(descr ""))
   (lib (name "74LVC125APW_118")(type "Legacy")(uri "${KIPRJMOD}/Additional Libraries/74LVC125APW_118/74LVC125APW_118.lib")(options "")(descr ""))
   (lib (name "UCT")(type "KiCad")(uri "${KIPRJMOD}/Additional Libraries/uct_kicad_library/symbols/UCT.kicad_sym")(options "")(descr ""))
+  (lib (name "SKRPASE010")(type "Legacy")(uri "${KIPRJMOD}/Additional Libraries/SKRPASE010/SKRPASE010.lib")(options "")(descr ""))
 )
