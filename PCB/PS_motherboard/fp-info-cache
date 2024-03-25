@@ -1,4 +1,4 @@
-23164315059285199
+23198422527542377
 74LVC125APW_118
 SOP65P640X110-14N
 
@@ -93995,6 +93995,146 @@ igbt diode module
 0
 25
 25
+UCT KiCad Library
+7_Seg_x3
+
+
+0
+12
+12
+UCT KiCad Library
+7_Seg_x3_7.62
+
+
+0
+12
+12
+UCT KiCad Library
+18650_Holder_SMD
+
+
+0
+5
+2
+UCT KiCad Library
+30035 SiPM
+
+
+0
+8
+4
+UCT KiCad Library
+Barrel_Jack_2A_C84007
+
+
+0
+3
+3
+UCT KiCad Library
+Barrier_Terminal_Blocks_4P_7.62mm
+
+
+0
+4
+4
+UCT KiCad Library
+Block
+
+
+0
+0
+0
+UCT KiCad Library
+RK09_THT_Pot_C209770
+
+
+0
+5
+3
+UCT KiCad Library
+STLINK_UCT
+
+
+0
+9
+9
+UCT KiCad Library
+STM32F051C6T6
+
+
+0
+48
+48
+UCT KiCad Library
+STM32F446_Target
+
+
+0
+62
+62
+UCT KiCad Library
+SW
+
+
+0
+3
+3
+UCT KiCad Library
+SW_GT-TCA84
+
+
+0
+6
+6
+UCT KiCad Library
+USB_Conn_JLC_LCSC_C404969
+
+
+0
+15
+6
+UCT KiCad Library
+XT60PW-M
+
+
+0
+2
+2
+UCT KiCad Library
+conn 06x02_SMD
+
+
+0
+12
+12
+UCT KiCad Library
+conn 12x02_SMD
+
+
+0
+24
+24
+UCT KiCad Library
+conn_01x05_2.54_SMD_3mm
+
+
+0
+5
+5
+UCT KiCad Library
+conn_01x05_2.54_SMD_5mm
+
+
+0
+5
+5
+UCT KiCad Library
+mm_mcu_v0
+
+
+0
+76
+76
 Valve
 Valve_ECC-83-1
 Valve ECC-83-1 round pins

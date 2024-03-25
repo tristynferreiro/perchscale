@@ -3305,7 +3305,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Inductor_SMD:L_0603_1608Metric"
 			(at 115.824 74.422 0)
 			(effects
 				(font
@@ -3314,7 +3314,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "~"
+		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2304140030_TDK-MLF1608A3R3JT000_C275346.pdf"
 			(at 115.824 74.422 0)
 			(effects
 				(font
@@ -3324,6 +3324,24 @@
 			)
 		)
 		(property "Description" ""
+			(at 115.824 74.422 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Extended" "1"
+			(at 115.824 74.422 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C275346"
 			(at 115.824 74.422 0)
 			(effects
 				(font

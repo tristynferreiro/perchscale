@@ -6832,6 +6832,24 @@
 				(hide yes)
 			)
 		)
+		(property "Extended" "1"
+			(at 31.115 58.42 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "https://jlcpcb.com/parts/2nd/Connectors/Screw_Terminal_3902?searchTxt=Phoenix%20contact"
+			(at 31.115 58.42 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
 		(pin "1"
 			(uuid "87ef0f45-d95d-4ef6-b547-db1362c4468c")
 		)
@@ -7719,7 +7737,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2005150044_ALPSALPINE-SKRPASE010_C470427.pdf"
+		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2108142330_G-Switch-GT-TCA84B-H015-L10_C2848967.pdf"
 			(at 234.95 151.765 0)
 			(effects
 				(font
@@ -7746,7 +7764,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C470427"
+		(property "LCSC" "C2848967"
 			(at 234.95 156.845 0)
 			(effects
 				(font
