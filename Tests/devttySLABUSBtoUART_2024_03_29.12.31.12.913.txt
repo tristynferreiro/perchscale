@@ -1,0 +1,6 @@
+d�@�S��PFL�VtStartup is complete
+***
+Start cation:
+Place the load cell an a level slibratable surface.
+Reve moany load applied to the load cell.
+Send 't' from serial monitor to set the tare offset.
