@@ -1,6 +1,7 @@
 /*
-* This the the Scale UART sender project. It reads the scale data and transmits it over UART
-* First perch-scale submodule (scale and data/microcontroller) integration test 
+* This script runs calibration on startup and then takes readings from the HX711 and prints them to serial. 
+*
+* 5/04/2024: Working
 */
 
 //------------------INCLUDES------------------------
@@ -17,14 +18,12 @@
 const int HX711_dout = 32; // D32 mcu > HX711 dout pin 
 const int HX711_sck = 33; // D33 mcu > HX711 sck pin
 
-//HX711 constructor:
-HX711_ADC LoadCell(HX711_dout, HX711_sck); // make an HX711 object
+HX711_ADC LoadCell(HX711_dout, HX711_sck); // instantiate an HX711 object
 
 // EEPROM address
 const int calVal_eepromAdress = 0;
 
-// scale readings counter
-int num_readings = 0;
+int num_readings = 0; // scale readings counter
 //------------------------------------------------------
 
 
