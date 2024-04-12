@@ -17,6 +17,7 @@
 //--------------------GLOBAL VARIABLES-----------------
 RTC_DS3231 rtc; // instantiate an RTClib object
 
+//------------------------------------------------------
 void setup() {
   Serial.begin(9600);
   Wire.begin(); // required by the RTClib library because I2C is used
