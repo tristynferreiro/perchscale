@@ -26,7 +26,6 @@ const int calVal_eepromAdress = 0;
 int num_readings = 0; // scale readings counter
 //------------------------------------------------------
 
-
 void setup() {
   // SERIAL SETUP
   Serial.begin(9600); // Initialise baud rate with PC

@@ -1,7 +1,7 @@
 /*
 * This script runs loadcell calibration on startup and prints TIMESTAMPED HX711 readings over serial. 
 *
-* 12/04/2024:
+* Working: 12/04/2024
 *
 * Pin connections:
 *   SCL of RTC -> SCL (PIN 22) of ESP32
