@@ -1,7 +1,7 @@
 /*
 * This script runs loadcell calibration on startup and saves the TIMESTAMPED HX711 readings to a file on an SD card. 
 *
-* Working: 19/04/2024
+* Working: 03/05/2024
 *
 * Pin connections:
 *   SCL of RTC -> SCL (PIN 22) of ESP32

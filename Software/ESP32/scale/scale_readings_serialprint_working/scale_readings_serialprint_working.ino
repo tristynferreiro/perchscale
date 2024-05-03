@@ -2,6 +2,17 @@
 * This script runs calibration on startup and then takes readings from the HX711 and prints them to serial. 
 *
 * 5/04/2024: Working
+
+* Pin connections:
+*   SCL of RTC -> SCL (PIN 22) of ESP32
+*   SDA of RTC -> SDA (PIN 21) of ESP32
+*   GND of RTC -> GND of ESP32
+*   Vcc of RTC -> 5V of ESP32
+*
+*   SCL of HX -> SCL (PIN 33) of ESP32
+*   SDA of HX -> SDA (PIN 32) of ESP32
+*   GND of HX -> GND of ESP32
+*   Vcc of HX -> 5V of ESP32
 */
 
 //------------------INCLUDES------------------------
