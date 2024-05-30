@@ -41,7 +41,7 @@
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
 #define MSG_BUFFER_SIZE 10000
-#define file_name_path "/weight_readings_4.txt"
+#define file_name_path "/weight_readings_31052024.txt"
 
 //--------------------GLOBAL VARIABLES-----------------
 // HX711 pins:
@@ -394,7 +394,7 @@ void loop() {
             Serial.println("Next Tare Complete");
             // Record tare event on SD card
             sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-            if(MSG_BUFFER_SIZE-strlen(msg)<=28){
+            if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
               // Save to text file on SD card
               appendFile(SD, file_name_path, msg);
               strcpy(msg, "");
@@ -409,14 +409,14 @@ void loop() {
         // Get current time from RTC
         now = rtc.now();
     
-        // Record the reading 
+        // Append the reading to the buffer
         sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), num_readings, reading); 
         if(MSG_BUFFER_SIZE-strlen(msg)<=28){
               // Save to text file on SD card
               appendFile(SD, file_name_path, msg);
               strcpy(msg, "");
               //memset(msg, 0, MSG_BUFFER_SIZE);
-              Serial.println("Written to file.");
+              Serial.println("Written to file. Number of readings: "+ String(num_readings));
         }
         newDataReady = 0;
         num_readings++;
