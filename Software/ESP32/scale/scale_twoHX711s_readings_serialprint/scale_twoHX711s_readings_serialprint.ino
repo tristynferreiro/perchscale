@@ -18,14 +18,14 @@
 const int HX711_1_dout = 32; // D32 mcu > HX711_1 dout pin 
 const int HX711_1_sck = 33; // D33 mcu > HX711_1 sck pin
 const int HX711_2_dout = 4; // D4 mcu > HX711_2 dout pin 
-const int HX711_2_sck = 32; // D32 mcu > HX711_2 sck pin (Should be the same for multiple HX711s)
+const int HX711_2_sck = 33; // D33 mcu > HX711_2 sck pin (Should be the same for multiple HX711s)
 
 HX711_ADC LoadCell1(HX711_1_dout, HX711_1_sck); // instantiate an HX711 object for the first HX711
 HX711_ADC LoadCell2(HX711_2_dout, HX711_2_sck); // instantiate an HX711 object for the second HX711
 
 // EEPROM address
 const int calVal_eepromAdress_1 = 0;
-const int calVal_eepromAdress_2 = 1;
+const int calVal_eepromAdress_2 = 4;
 
 
 int num_readings = 0; // scale readings counter
@@ -41,8 +41,20 @@ void setup() {
   // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
   unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
   boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
-  LoadCell1.start(stabilizingtime, _tare);
-  LoadCell2.start(stabilizingtime, _tare);
+  
+  // Initialise the two individual HX711s
+  byte loadcell_1_rdy = 0;
+  byte loadcell_2_rdy = 0;
+
+  while ((loadcell_1_rdy + loadcell_2_rdy) < 2) { //run startup, stabilization and tare, both modules simultaniously
+    if (!loadcell_1_rdy) loadcell_1_rdy = LoadCell1.startMultiple(stabilizingtime, _tare);
+    if (!loadcell_2_rdy) loadcell_2_rdy = LoadCell2.startMultiple(stabilizingtime, _tare);
+  }
+  
+  // LoadCell1.start(stabilizingtime, _tare);
+  // LoadCell2.start(stabilizingtime, _tare);
+  // LoadCell1.startMultiple(stabilizingtime, _tare);
+  // LoadCell2.startMultiple(stabilizingtime, _tare);
 
   if (LoadCell1.getTareTimeoutFlag() || LoadCell1.getSignalTimeoutFlag()) {
     Serial.println("Timeout, check MCU>HX711_1 wiring and pin designations");
@@ -66,11 +78,15 @@ void loop() {
   static boolean newDataReady = 0;
 
   // check for new data/start next conversion:
-  if (LoadCell1.update() && LoadCell2.update()) newDataReady = true;
+  if (LoadCell1.update()) newDataReady = true;
+  LoadCell2.update();
 
   if (newDataReady) {
+      float reading;
       float reading_1 = LoadCell1.getData();
-      float reading_2 = LoadCell2.getData();
+      float reading_2= LoadCell2.getData();
+      Serial.print("1:");Serial.println(reading_1);
+      Serial.print("2:");Serial.println(reading_2);
       reading = reading_1 + reading_2;
       if(reading<1 & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
         boolean _resume = false;
@@ -105,7 +121,7 @@ void loop() {
   if (Serial.available() > 0) {
     char inByte = Serial.read();
     if (inByte == 't') {
-      LoadCell1.tareNoDelay() // tare load cell 1
+      LoadCell1.tareNoDelay(); // tare load cell 1
       LoadCell2.tareNoDelay(); //tare load cell 2
     }
     else if (inByte == 'r') calibrate(); //calibrate
@@ -113,10 +129,10 @@ void loop() {
   }
 
   // check if last tare operation is complete
-  if (LoadCell1.getTareStatus()) {
+  if (LoadCell1.getTareStatus() == true) {
     Serial.println("Tare of HX711_1 complete");
   }
-  else if (LoadCell2.getTareStatus() == true) {
+  if (LoadCell2.getTareStatus() == true) {
     Serial.println("Tare of HX711_2 complete");
   }
 
@@ -135,19 +151,13 @@ void calibrate() {
     LoadCell1.update();
     LoadCell2.update();
     if (Serial.available() > 0) {
-      if (Serial.available() > 0) {
         char inByte = Serial.read();
         if (inByte == 't') {
           LoadCell1.tareNoDelay();
           LoadCell2.tareNoDelay();
-      }
     }
-    if (LoadCell1.getTareStatus()) {
-      Serial.println("Tare of HX711_1 complete");
-      // _resume = true;
-    }
-    else if (LoadCell2.getTareStatus() == true) {
-      Serial.println("Tare of HX711_2 complete");
+    if ((LoadCell1.getTareStatus() && LoadCell2.getTareStatus()) == true) {
+      Serial.println("Tare of HX711s complete");
       _resume = true;
     }
   }
@@ -183,11 +193,13 @@ void calibrate() {
   // HX711_2
   Serial.print("New calibration value for HX711_2 has been set to: ");
   Serial.print(newCalibrationValue2);
-  Serial.println(", use this as calibration value (calFactor) in your project sketch.");  
+  Serial.println(", use this as calibration value (calFactor) in your project sketch."); 
+  // Write to EEPROM 
   Serial.print("Save these values to EEPROM address ");
   Serial.print(calVal_eepromAdress_1);
+  Serial.print(", ");
   Serial.print(calVal_eepromAdress_2);
-  Serial.print("respectively");
+  Serial.print(" respectively");
   Serial.println("? y/n");
 
   _resume = false;
@@ -228,6 +240,7 @@ void calibrate() {
   Serial.println("To re-calibrate, send 'r' from serial monitor.");
   Serial.println("For manual edit of the calibration value, send 'c' from serial monitor.");
   Serial.println("***");
+  }
 }
 
 void changeSavedCalFactor() {
@@ -245,9 +258,9 @@ void changeSavedCalFactor() {
     if (Serial.available() > 0) {
       newCalibrationValue1 = Serial.parseFloat();
       if (newCalibrationValue1 != 0) {
-        Serial.print("New calibration value is: ");
+        Serial.print("New calibration value for HX711_1 is: ");
         Serial.println(newCalibrationValue1);
-        LoadCell.setCalFactor(newCalibrationValue1);
+        LoadCell1.setCalFactor(newCalibrationValue1);
         // _resume = true;
       }
     }
@@ -261,16 +274,16 @@ void changeSavedCalFactor() {
     if (Serial.available() > 0) {
       newCalibrationValue2 = Serial.parseFloat();
       if (newCalibrationValue2 != 0) {
-        Serial.print("New calibration value is: ");
+        Serial.print("New calibration value for HX711_2 is: ");
         Serial.println(newCalibrationValue2);
-        LoadCell.setCalFactor(newCalibrationValue2);
+        LoadCell2.setCalFactor(newCalibrationValue2);
         _resume = true;
       }
     }
   }  
   _resume = false;
   // Save HX711_1 calibratin value to EEPROM
-  Serial.print("Save this value to EEPROM address ");
+  Serial.print("Save HX711_1 calibration value to EEPROM address ");
   Serial.print(calVal_eepromAdress_1);
   Serial.println("? y/n");
   while (_resume == false) {
@@ -299,7 +312,7 @@ void changeSavedCalFactor() {
   }
 
   // Save HX711_2 calibration value to EEPROM
-  Serial.print("Save this value to EEPROM address ");
+  Serial.print("Save HX711_2 calibration value to EEPROM address ");
   Serial.print(calVal_eepromAdress_2);
   Serial.println("? y/n");
   while (_resume == false) {
