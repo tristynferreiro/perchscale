@@ -6,7 +6,6 @@
 * Pin connections:
 *   None
 */
-// Interesting resource explaining how BLE works: https://devzone.nordicsemi.com/guides/short-range-guides/b/bluetooth-low-energy/posts/ble-characteristics-a-beginners-tutorial
 
 //------------------INCLUDES------------------------
 // Add your includes here
