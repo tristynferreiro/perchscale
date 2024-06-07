@@ -1,8 +1,8 @@
 /*
-* This script runs calibration on startup and then takes readings from the HX711 and prints them to serial. 
+* SCRIPT DESCRIPTION
 *
-* 5/04/2024: Working
-
+* Working: 5/04/2024
+*
 * Pin connections:
 *   SCL of OLED -> SCL (PIN 22) of ESP32
 *   SDA of OLED -> SDA (PIN 21) of ESP32
