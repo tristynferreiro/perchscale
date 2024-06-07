@@ -41,8 +41,8 @@
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
 #define MSG_BUFFER_SIZE 10000
-#define file_name_path "/weight_readings_31052024.txt"
-
+#define file_name_path "/weight_readings_05062024_test.txt"
+//------------------------------------------------------
 //--------------------GLOBAL VARIABLES-----------------
 // HX711 pins:
 const int HX711_dout = 32; // D32 mcu > HX711 dout pin 
@@ -64,7 +64,7 @@ DateTime now;
 
 char msg[MSG_BUFFER_SIZE];
 //int msg_index = 0;
-
+//------------------------------------------------------
 //--------------------HELPER FUNCTIONS-----------------
 // SCALE
 void calibrate() {
