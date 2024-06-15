@@ -1,63 +1,47 @@
-// simple project using Arduino UNO and 128x64 OLED Display to display a menu
-// created by upir, 2022
-// youtube channel: https://www.youtube.com/upir_upir
+/*
+* WRITE DESCRIPTIONS
+*
+* Working: 15/06/2024
+*
+* Pin connections:
+*   OLED:
+*   GND -> GND
+*   VCC -> 3V3
+*   SCL -> D22
+*   SDA -> D21
+*   DPAD:
+*   Up Button -> D15
+*   Select Button -> D27
+*   Down Button -> D26
+*   Back Button -> D4
+*/
 
-// YOUTUBE VIDEO: https://youtu.be/HVHVkKt-ldc
-// YOUTUBE VIDEO u8g2 version: https://youtu.be/K5e0lFRvZ2E
-
-// links from the video:
-// Flipper Zero menu - https://docs.flipperzero.one/basics/control#M5BZO
-// WOKWI start project progress bar - https://wokwi.com/projects/300867986768527882
-// image2cpp - https://javl.github.io/image2cpp/
-// 128x64 SSD1306 OLED Display: https://s.click.aliexpress.com/e/_DCKdvnh
-// Transparent OLED display: https://s.click.aliexpress.com/e/_Dns6eLz
-// Arduino UNO: https://s.click.aliexpress.com/e/_AXDw1h
-// Arduino UNO MINI: https://store.arduino.cc/products/uno-mini-le
-// Big OLED Display: https://s.click.aliexpress.com/e/_ADL0T9
-// Arduino breadboard prototyping shield: https://s.click.aliexpress.com/e/_ApbCwx
-// u8g fonts (fonts available for u8g library): https://nodemcu-build.com/u8g-fonts.php
-// u8g documentation: https://github.com/olikraus/u8glib/wiki/userreference
-// Photopea (online Photoshop-like tool): https://www.photopea.com/
-// image2cpp (convert images into C code): https://javl.github.io/image2cpp/
-// Push buttons - https://s.click.aliexpress.com/e/_DmXS8B9
-// LCD displays: https://s.click.aliexpress.com/e/_DBgR45P
-// u8g2 documentation: https://github.com/olikraus/u8g2/wiki/u8gvsu8g2
-// Image Magick: https://imagemagick.org/index.php
-// LCD Image converter: https://lcd-image-converter.riuson.com/en/about/
-
-
-// Related videos:
-// Arduino Parking Sensor - https://youtu.be/sEWw087KOj0
-// Turbo pressure gauge with Arduino and OLED display - https://youtu.be/JXmw1xOlBdk
-// Arduino Car Cluster with OLED Display - https://youtu.be/El5SJelwV_0
-// Knob over OLED Display - https://youtu.be/SmbcNx7tbX8
-// Arduino + OLED = 3D ? - https://youtu.be/kBAcaA7NAlA
-// Arduino OLED Gauge - https://youtu.be/xI6dXTA02UQ
-// Smaller & Faster Arduino - https://youtu.be/4GfPQoIRqW8
-
-
-
+//------------------INCLUDES------------------------
+// OLED
 #include "U8g2lib.h"
-
-#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+
+#include <Wire.h>
 // String
 #include <string>
 //--------------------------------------------------
 
 
 //--------------------DEFINES-------------------------
+// OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define DELAY_COUNTER 60 // Delay for text on screen
+
+// DPAD Buttons
+#define BUTTON_UP_PIN 15 // pin for UP button 
+#define BUTTON_SELECT_PIN 27 // pin for SELECT button
+#define BUTTON_DOWN_PIN 26 // pin for DOWN button
+#define BUTTON_BACK_PIN 4 // pin for BACK button
 //----------------------------------------------------
 
-//--------------------GLOBAL VARIABLES-----------------
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate an SSD1306 display connected to I2C
-
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 1024 bytes]
+// ------------------ GENERATED BITMAPS ---------------------------------
 
 // 'scrollbar_background', 8x64px
 const unsigned char bitmap_scrollbar_background [] PROGMEM = {
@@ -102,10 +86,15 @@ const unsigned char bitmap_item_sel_outline [] PROGMEM = {
   };
 
 
+// ----------------------------------------------------------------------
 
-// ------------------ end generated bitmaps from image2cpp ---------------------------------
+//--------------------GLOBAL VARIABLES-----------------
 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate an SSD1306 display connected to I2C
 
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 1024 bytes]
+
+// Menu variables
 
 const int NUM_ITEMS = 4; // number of items in the list
 const int MAX_ITEM_LENGTH = 10; // maximum characters for the item name
@@ -116,41 +105,38 @@ char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Calibrate" },
   { "Connect" }
  };
-// note - when changing the order of items above, make sure the other arrays referencing bitmaps
-// also have the same order, for example array "bitmap_icons" for icons, and other arrays for screenshots and QR codes
 
-#define BUTTON_UP_PIN 15 // pin for UP button 
-#define BUTTON_SELECT_PIN 27 // pin for SELECT button
-#define BUTTON_DOWN_PIN 26 // pin for DOWN button
-#define BUTTON_BACK_PIN 4 // pin for BACK button
-
-int display_counter = 0;
-int process_screen = 0;
-
-int button_up_clicked = 0; // only perform action when button is clicked, and wait until another press
-int button_select_clicked = 0; // same as above
-int button_down_clicked = 0; // same as above
-int button_back_clicked = 0; // same as above
+int current_screen = 0; // screen number which the menu is on
 
 int item_selected = 0; // which item in the menu is selected
 
 int item_sel_previous; // previous item - used in the menu screen to draw the item before the selected one
 int item_sel_next; // next item - used in the menu screen to draw next item after the selected one
 
-int current_screen = 0;
+// Sub-menu and display delays
+
+int display_counter = 0;
+int process_screen = 0;
+
+// Button states
+
+int button_up_clicked = 0; // only perform action when button is clicked, and wait until another press
+int button_select_clicked = 0; // same as above
+int button_down_clicked = 0; // same as above
+int button_back_clicked = 0; // same as above
 
 void setup() {
 
-  // SERIAL SETUP
+  //--------------------SERIAL SETUP-----------------------
   Serial.begin(9600); // Initialise baud rate with PC
+
+  //--------------------OLED SETUP-----------------------
 
   u8g2.setColorIndex(1);  // set the color to white
   u8g2.begin();
   u8g2.setBitmapMode(1);
 
-  // define pins for buttons
-  // INPUT_PULLUP means the button is HIGH when not pressed, and LOW when pressed
-  // since it´s connected between some pin and GND
+  //--------------------DPAD SETUP-----------------------
   pinMode(BUTTON_UP_PIN, INPUT); // up button
   pinMode(BUTTON_SELECT_PIN, INPUT); // select button
   pinMode(BUTTON_DOWN_PIN, INPUT); // down button
@@ -162,21 +148,25 @@ void setup() {
 
 void loop() {
 
+  //--------------------MAIN MENU-----------------------
+
   if (current_screen == 0) { // MENU SCREEN
 
       // up and down buttons only work for the menu screen
+      //--------------------UP BUTTON-----------------------
       if ((digitalRead(BUTTON_UP_PIN) == LOW) && (button_up_clicked == 0)) { // up button clicked - jump to previous menu item
         item_selected = item_selected - 1; // select previous item
-        Serial.print("Item Selected:");
+        Serial.print("Item Selected:"); // DEBUGGING CODE
         Serial.println(String(menu_items[item_selected]));        
         button_up_clicked = 1; // set button to clicked to only perform the action once
         if (item_selected < 0) { // if first item was selected, jump to last item
           item_selected = NUM_ITEMS-1;
         }
       }
+      //--------------------DOWN BUTTON-----------------------
       else if ((digitalRead(BUTTON_DOWN_PIN) == LOW) && (button_down_clicked == 0)) { // down button clicked - jump to next menu item       
         item_selected = item_selected + 1; // select next item
-        Serial.print("Item Selected:");
+        Serial.print("Item Selected:"); // DEBUGGING CODE
         Serial.println(String(menu_items[item_selected]));       
         button_down_clicked = 1; // set button to clicked to only perform the action once
         if (item_selected >= NUM_ITEMS) { // last item was selected, jump to first menu item
@@ -193,13 +183,13 @@ void loop() {
 
   }
 
-// Select click
+  //--------------------SELECT BUTTON-----------------------
   if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
     button_select_clicked = 1; // set button to clicked to only perform the action once
     
     if ((current_screen == 0)) {current_screen = 1;} // main menu --> scale screen
     //  else if (current_screen == 1 && String(menu_items[item_selected])!="Calibrate") {current_screen = 0;} // scale screen --> main menu
-     else if (current_screen == 1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 2;} // COMMENT
+     else if (current_screen == 1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 2;} // If on calibrate, move to sub-menu
      else if (current_screen == 2 && String(menu_items[item_selected])=="Calibrate") {
       process_screen = 0;
       current_screen = 3;}
@@ -210,10 +200,11 @@ void loop() {
   if ((digitalRead(BUTTON_SELECT_PIN) == HIGH) && (button_select_clicked == 1)) { // unclick 
     button_select_clicked = 0;
   }
-// Back click
-  if ((digitalRead(BUTTON_BACK_PIN) == LOW) && (button_back_clicked == 0)) { // select button clicked, jump between screens
+
+  //--------------------BACK BUTTON-----------------------
+  if ((digitalRead(BUTTON_BACK_PIN) == LOW) && (button_back_clicked == 0)) { // back button clicked, return to main menu
      button_back_clicked = 1; // set button to clicked to only perform the action once
-     if (current_screen == 1) {current_screen = 0;} // scale screen --> main menu
+     if (current_screen == 1) {current_screen = 0;} // sub-menu 1 screen --> main menu
      else if (current_screen == 2) {current_screen = 0;}
      else if (current_screen == 3) {current_screen = 0;}
      else if (current_screen == 4) {current_screen = 0;}
@@ -233,6 +224,7 @@ void loop() {
 
   u8g2.clearBuffer();  // clear buffer for storing display content in RAM
 
+    //--------------------MAIN MENU DISPLAY-----------------------
     if (current_screen == 0) { // MENU SCREEN
 
       // selected item background
@@ -488,13 +480,6 @@ void loop() {
       current_screen = 0;
       process_screen = 0;
       display_counter = 0;
-    }
-    else if (current_screen == 2) { // SUB-MENU SCREEN
-      display.clearDisplay();
-      display.setTextSize(3);
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);
-      display.print("Connect"); 
     }
 
 
