@@ -195,11 +195,14 @@ void loop() {
 
 // Select click
   if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
-     button_select_clicked = 1; // set button to clicked to only perform the action once
-     if ((current_screen == 0)) {current_screen = 1;} // main menu --> scale screen
+    button_select_clicked = 1; // set button to clicked to only perform the action once
+    
+    if ((current_screen == 0)) {current_screen = 1;} // main menu --> scale screen
     //  else if (current_screen == 1 && String(menu_items[item_selected])!="Calibrate") {current_screen = 0;} // scale screen --> main menu
      else if (current_screen == 1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 2;} // COMMENT
-     else if (current_screen == 2 && String(menu_items[item_selected])=="Calibrate") {current_screen = 3;}
+     else if (current_screen == 2 && String(menu_items[item_selected])=="Calibrate") {
+      process_screen = 0;
+      current_screen = 3;}
      else if (current_screen == 3 && String(menu_items[item_selected])=="Calibrate") {current_screen = 4;}
      else if (current_screen == 4 && String(menu_items[item_selected])=="Calibrate") {current_screen = 5;}
     //  else {current_screen = 0;} // qr codes screen --> menu items screen
@@ -361,11 +364,11 @@ void loop() {
       u8g2.println("Enter once placed");          
       //------------------------- CALIBRATE WITH 10g --------------------------------   
       Serial.println(display_counter);
-      if(display_counter == DELAY_COUNTER){ // If succesfully got cal val for 10g
-        process_screen = 0;
-        display_counter = 0;
-        // current_screen = 3;
-      }
+      // if(display_counter == DELAY_COUNTER){ // If succesfully got cal val for 10g
+      //   process_screen = 0;
+      //   display_counter = 0;
+      //   current_screen = 3;
+      // }
       display_counter++;
       //----------------------------------------------------------------------------     
     }   
