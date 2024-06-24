@@ -1,0 +1,19 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "8f6a2fe4-46a5-4c93-90da-ed76375fa4dd")
+	(paper "A4")
+	(title_block
+		(title "PerchScale Controller")
+		(rev "v0")
+		(company "University of Cape Town")
+		(comment 1 "@author: Tristyn Ferreiro")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)
