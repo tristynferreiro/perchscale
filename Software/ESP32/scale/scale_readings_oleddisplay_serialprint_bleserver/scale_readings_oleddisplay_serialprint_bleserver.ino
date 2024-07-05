@@ -72,14 +72,47 @@ static String nokMSG = "nok";
 BLECharacteristic *readCharacteristic;
 BLECharacteristic *tareCharacteristic;
 BLECharacteristic *calibrateCharacteristic;
+String status = "-1";
 
+// Calibration
+float calibration_points[10]; // size = how many calibration weights used
+int num_points=0; // counter to keep track of calibration points
+bool calibrate_complete_flag = false;
+
+//------------------------------------------------------
+//------------------HELPER FUNCTIONS------------------------
+class ServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      deviceConnected = true;
+      Serial.println("Device Connected.");
+      status = "connected"; // OLED set the status
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      deviceConnected = false;
+      status = "-1"; // OLED reset the status
+      Serial.println("Device Disconnected.");
+      delay(500); // give the bluetooth stack the chance to get things ready
+
+      // RESET ALL CHARACTERISTICS
+      readCharacteristic->setValue("read");
+      tareCharacteristic->setValue("tare"); 
+      calibrateCharacteristic->setValue("calibrate"); 
+      Serial.println("Reset characteristics");
+
+      BLEDevice::startAdvertising();
+      Serial.println("Started re-advertising.");
+
+
+    }
+};
 //------------------------------------------------------
 
 void setup() {
   // SERIAL SETUP
   Serial.begin(9600); // Initialise baud rate with PC
   
-  // LOADCELL SETUP
+  //----------LOADCELL SETUP------------------------
   LoadCell.begin();
   // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
   unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
@@ -89,82 +122,261 @@ void setup() {
   if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
-  }
-  // else {
+  }  // else {
   //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
   //   Serial.println("Startup is complete");
   // }
-    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+  Serial.println("Loadcell Startup is complete");
+
+  //----------OLED SETUP------------------------
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
   delay(2000);
   display.clearDisplay();
+  Serial.println("OLED Startup is complete");
 
-  Serial.println("Startup is complete");
+  //----------BLE SERVER SETUP------------------------
+  Serial.println("Starting BLE work!");
+  BLEDevice::init("PerchScale");
+  BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new ServerCallbacks());
+
+  //****** CONNECT SERVICE
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  BLECharacteristic *pCharacteristic =
+    pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+
+  pCharacteristic->setValue("connect");
+  pService->start();
+  //****** WEIGH SERVICE
+  BLEService *weighService = pServer->createService(SERVICE_UUID_WEIGH);
+  
+  readCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_READ, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+
+  weighService->addCharacteristic(readCharacteristic);
+  readCharacteristic->setValue("read");
+  
+  tareCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_TARE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  weighService->addCharacteristic(tareCharacteristic); 
+  tareCharacteristic->setValue("tare"); 
+
+  calibrateCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_CALIBRATE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  weighService->addCharacteristic(calibrateCharacteristic); 
+  calibrateCharacteristic->setValue("calibrate"); 
+
+  weighService->start();
+   
+  // BLE Server: Begin advertising services & characteristics
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->addServiceUUID(SERVICE_UUID_WEIGH);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+  pAdvertising->setMinPreferred(0x12);
+  BLEDevice::startAdvertising();
+  Serial.println("Characteristic defined! Now you can read it in your phone!");
+  // ----------------------------------------------- 
 
   // Output that startup is complete on display
   writeToDisplayCentre(2.5, WHITE, "Startup complete");
 
-  while (!LoadCell.update());
-  calibrate(); //start calibration procedure
+  //while (!LoadCell.update());
+  //calibrate(); //start calibration procedure
 }
 
 void loop() {
+  //----------CONTROLLER MODE------------------------
+  // If BLE device is connected, respond according to commands
+  if(deviceConnected){ 
+    if(status == "connected"){
+      writeToDisplayCentre(2.5, WHITE, "Controller connected");
+    }else if (status == "tare"){
+      writeToDisplayCentre(2.5, WHITE, "Tare done");
+    }else if (status == "calibrate"){
 
-  static boolean newDataReady = 0;
+    }else if(status == "read"){
 
-  // check for new data/start next conversion:
-  if (LoadCell.update()) newDataReady = true;
+    }
 
-  if (newDataReady) {
-      float reading = LoadCell.getData();
-      if(reading<1 & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
-        boolean _resume = false;
-        boolean _tarewait = true;
-        while (_resume == false) {
-          LoadCell.update();
-          if(_tarewait){              
-            LoadCell.tareNoDelay();
-            _tarewait = false;
+    //*********** CONTROLLER Read
+    String readVal = readCharacteristic->getValue().c_str(); // BLE: read characteristic
+    // Serial.print("Read:"); Serial.println(readVal);
+
+    if (readVal == rstMSG) {
+      Serial.println("Resetting read value.");
+      readCharacteristic->setValue("read"); // BLE: set characteristic
+      status = "connected"; // OLED reset the status
+    } 
+    else if (readVal != "read" && readVal != rstMSG) {
+      Serial.println("Reading scale: ");
+      static boolean newDataReady = 0;
+
+      // check for new data/start next conversion:
+      if (LoadCell.update()) newDataReady = true;
+
+      if (newDataReady) {
+          float reading = LoadCell.getData();
+          if(reading<1 & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
+            boolean _resume = false;
+            boolean _tarewait = true;
+            while (_resume == false) {
+              LoadCell.update();
+              if(_tarewait){              
+                LoadCell.tareNoDelay();
+                _tarewait = false;
+              }
+              if (LoadCell.getTareStatus() == true) {
+                readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
+                writeToDisplayCentre(2.5, WHITE, "Tare done");
+                // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
+
+                Serial.println("Next Tare Complete");
+                _resume = true;
+                // delay(2000);
+              }
+            }
           }
-          if (LoadCell.getTareStatus() == true) {
-            
-            writeToDisplayCentre(2.5, WHITE, "Tare done");
-            // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
+          else if (reading>1){ //If a bird or heavy object is detected on the scale
+              String reading_msg = String(reading) + "g";
+              readCharacteristic->setValue(String(reading_msg).c_str()); // BLE: Updating value to scale reading
+              writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+              // writeToDisplay(3, WHITE, 0, 4, reading_msg.c_str());
+              Serial.print(String(num_readings) + "," + String(reading));
+              newDataReady = 0;
+              num_readings++;
+          }
+        
+      }
+      status="read";
+    } 
 
-            Serial.println("Next Tare Complete");
-            _resume = true;
-            // delay(2000);
+    //*********** CONTROLLER Tare
+    String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
+    // Serial.print("Tare:");
+    // Serial.println(tareVal);
+    if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
+      Serial.println("Unacceptable tare value received.");
+      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
+    } 
+    if (tareVal == "t") {
+      status = "tare"; // OLED set the status
+      Serial.println("Tare command received");
+      LoadCell.tareNoDelay(); //tare
+
+      writeToDisplayCentre(2.5, WHITE, "Tare done");
+      tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
+      Serial.println("Tare complete");
+    } 
+    else if (tareVal == rstMSG) {
+      Serial.println("Resetting tare value.");
+      tareCharacteristic->setValue("tare"); // BLE: set characteristic
+      status = "connected"; // OLED reset the status
+    }
+
+    //*********** CONTROLLER Calibrate 
+    String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
+    // Serial.print("Calibrate:");
+    // Serial.println(calibrateVal);
+
+    if (calibrateVal == rstMSG) {
+      Serial.println("Resetting calibrate value.");
+      calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
+      calibrate_complete_flag = false;
+    }
+    if (calibrateVal == "10") {
+      Serial.println("Calibrate 10g command received");
+     
+      if(!calibrate_complete_flag){
+        calibrate(calibrateVal.toFloat());
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+      // If can't read from load cell, send fail
+      // calibrateCharacteristic->setValue(nokMSG);
+    }
+    if (calibrateVal == "20") {
+      Serial.println("Calibrate 20g command received");
+      if(!calibrate_complete_flag){
+        calibrate(calibrateVal.toFloat());
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+      // If can't read from load cell, send fail
+      // calibrateCharacteristic->setValue(nokMSG);    
+    }  
+    if (calibrateVal == "200") {
+      Serial.println("Calibrate 200g command received");
+      if(!calibrate_complete_flag){
+        calibrate(calibrateVal.toFloat());
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+      // If can't read from load cell, send fail
+      // calibrateCharacteristic->setValue(nokMSG);  
+    }
+    if (calibrateVal == "save"){
+      Serial.println("Saving Calibration value");
+      // CAL SAVE CALIBRATE FUNCTION --> STILL NEEDS TO BE WRITTEN
+    }
+    else if (calibrateVal != okMSG && calibrateVal != rstMSG && calibrateVal != "10" && calibrateVal != "20" && calibrateVal != "200" && calibrateVal != "calibrate") {
+      Serial.println("Unacceptable calibrate value received.");
+      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
+    }
+    
+    delay(200);
+  }
+  //----------STANDBY MODE------------------------
+  // If no controller is connected, read values and save to SD card (no OLED)
+  else if(!deviceConnected){
+    static boolean newDataReady = 0;
+
+    // check for new data/start next conversion:
+    if (LoadCell.update()) newDataReady = true;
+
+    if (newDataReady) {
+        float reading = LoadCell.getData();
+        if(reading<1 & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
+          boolean _resume = false;
+          boolean _tarewait = true;
+          while (_resume == false) {
+            LoadCell.update();
+            if(_tarewait){              
+              LoadCell.tareNoDelay();
+              _tarewait = false;
+            }
+            if (LoadCell.getTareStatus() == true) {
+              
+              writeToDisplayCentre(2.5, WHITE, "Tare done");
+              // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
+
+              Serial.println("Next Tare Complete");
+              _resume = true;
+              // delay(2000);
+            }
           }
         }
-      }
-      else if (reading>1){ //If a bird or heavy object is detected on the scale
-          String reading_msg = String(reading) + "g";
-          writeToDisplayCentre(3, WHITE, reading_msg.c_str());
-          // writeToDisplay(3, WHITE, 0, 4, reading_msg.c_str());
-          Serial.println(String(num_readings) + "," + String(reading));
-          newDataReady = 0;
-          num_readings++;
-      }
-    
-  }
+        else if (reading>1){ //If a bird or heavy object is detected on the scale
+            String reading_msg = String(reading) + "g";
+            writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+            // writeToDisplay(3, WHITE, 0, 4, reading_msg.c_str());
+            Serial.println(String(num_readings) + "," + String(reading));
+            newDataReady = 0;
+            num_readings++;
+        }
+      
+    }
 
-  // receive command from serial terminal
-  if (Serial.available() > 0) {
-    char inByte = Serial.read();
-    if (inByte == 't') LoadCell.tareNoDelay(); //tare
-    else if (inByte == 'r') calibrate(); //calibrate
-    else if (inByte == 'c') changeSavedCalFactor(); //edit calibration value manually
-  }
+    // check if last tare operation is complete
+    if (LoadCell.getTareStatus() == true) {
+      writeToDisplayCentre(2.5, WHITE, "Tare done");
+      // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
-  // check if last tare operation is complete
-  if (LoadCell.getTareStatus() == true) {
-    writeToDisplayCentre(2.5, WHITE, "Tare done");
-    // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
-
-    Serial.println("Tare complete");
+      Serial.println("Tare complete");
+    }
   }
+  
 
 }
 
@@ -196,94 +408,75 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
 }
 
 
-void calibrate() {
-
-  // writeToDisplay(2, WHITE, 0, 10, "Calibrating...");
+void calibrate(float calibration_weight) {
   writeToDisplayCentre(2, WHITE, "Calibrating...");
 
   Serial.println("***");
-  Serial.println("Start calibration:");
-  Serial.println("Place the load cell an a level stable surface.");
-  Serial.println("Remove any load applied to the load cell.");
-  Serial.println("Send 't' from serial monitor to set the tare offset.");
+  Serial.println("Starting calibration for "+ String(calibration_weight) + "g");
 
-  boolean _resume = false;
+  // Taring has been done before this method is called
+
+  float known_mass = calibration_weight;
+  bool _resume = false;
   while (_resume == false) {
     LoadCell.update();
-    if (Serial.available() > 0) {
-      if (Serial.available() > 0) {
-        char inByte = Serial.read();
-        if (inByte == 't') LoadCell.tareNoDelay();
-      }
-    }
-    if (LoadCell.getTareStatus() == true) {
-      Serial.println("Tare complete");
-      _resume = true;
-    }
+    if (known_mass != 0) {
+      Serial.println("Known mass is: " + String(known_mass));
+       _resume = true;
+    }  
   }
 
-  Serial.println("Now, place your known mass on the loadcell.");
-  Serial.println("Then send the weight of this mass (i.e. 100.0) from serial monitor.");
-
-  float known_mass = 0;
-  _resume = false;
-  while (_resume == false) {
-    LoadCell.update();
-    if (Serial.available() > 0) {
-      known_mass = Serial.parseFloat();
-      if (known_mass != 0) {
-        Serial.print("Known mass is: ");
-        Serial.println(known_mass);
-        _resume = true;
-      }
-    }
-  }
-
-  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correct
+  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correctly
   float newCalibrationValue = LoadCell.getNewCalibration(known_mass); //get the new calibration value
+  Serial.println("Calibration value = " + String(newCalibrationValue));
+  
+  // Store the point in the calibration array
+  calibration_points[num_points] = newCalibrationValue; 
+  num_points+=1;
+  calibrate_complete_flag = true;
 
-  Serial.print("New calibration value has been set to: ");
-  Serial.print(newCalibrationValue);
-  Serial.println(", use this as calibration value (calFactor) in your project sketch.");
-  Serial.print("Save this value to EEPROM adress ");
-  Serial.print(calVal_eepromAdress);
-  Serial.println("? y/n");
-
-  _resume = false;
-  while (_resume == false) {
-    if (Serial.available() > 0) {
-      char inByte = Serial.read();
-      if (inByte == 'y') {
-#if defined(ESP8266)|| defined(ESP32)
-        EEPROM.begin(512);
-#endif
-        EEPROM.put(calVal_eepromAdress, newCalibrationValue);
-#if defined(ESP8266)|| defined(ESP32)
-        EEPROM.commit();
-#endif
-        EEPROM.get(calVal_eepromAdress, newCalibrationValue);
-        Serial.print("Value ");
-        Serial.print(newCalibrationValue);
-        Serial.print(" saved to EEPROM address: ");
-        Serial.println(calVal_eepromAdress);
-        _resume = true;
-
-      }
-      else if (inByte == 'n') {
-        Serial.println("Value not saved to EEPROM");
-        _resume = true;
-      }
-    }
-  }
-
-  // writeToDisplay(2, WHITE, 0, 10, "Calibration complete!");
-  writeToDisplayCentre(2, WHITE, "Calibration complete!");
-
-  Serial.println("End calibration");
+  Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
   Serial.println("***");
-  Serial.println("To re-calibrate, send 'r' from serial monitor.");
-  Serial.println("For manual edit of the calibration value, send 'c' from serial monitor.");
-  Serial.println("***");
+//   Serial.print("New calibration value has been set to: ");
+//   Serial.print(newCalibrationValue);
+//   Serial.print("Save this value to EEPROM address ");
+//   Serial.print(calVal_eepromAdress);
+//   Serial.println("? y/n");
+
+//   _resume = false;
+//   while (_resume == false) {
+//     if (Serial.available() > 0) {
+//       char inByte = Serial.read();
+//       if (inByte == 'y') {
+// #if defined(ESP8266)|| defined(ESP32)
+//         EEPROM.begin(512);
+// #endif
+//         EEPROM.put(calVal_eepromAdress, newCalibrationValue);
+// #if defined(ESP8266)|| defined(ESP32)
+//         EEPROM.commit();
+// #endif
+//         EEPROM.get(calVal_eepromAdress, newCalibrationValue);
+//         Serial.print("Value ");
+//         Serial.print(newCalibrationValue);
+//         Serial.print(" saved to EEPROM address: ");
+//         Serial.println(calVal_eepromAdress);
+//         _resume = true;
+
+//       }
+//       else if (inByte == 'n') {
+//         Serial.println("Value not saved to EEPROM");
+//         _resume = true;
+//       }
+//     }
+//   }
+
+//   writeToDisplayCentre(2, WHITE, "Calibration complete!");
+
+//   Serial.println("End calibration");
+//   Serial.println("***");
+//   Serial.println("To re-calibrate, send 'r' from serial monitor.");
+//   Serial.println("For manual edit of the calibration value, send 'c' from serial monitor.");
+//   Serial.println("***");
 
   delay(2000);
 }

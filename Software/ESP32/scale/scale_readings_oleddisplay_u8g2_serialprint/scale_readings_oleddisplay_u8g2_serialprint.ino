@@ -20,10 +20,10 @@
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
 #include <EEPROM.h>
 // OLED
-#include <Wire.h>
 #include "U8g2lib.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Wire.h>
 // String
 #include <string>
 #endif
@@ -32,10 +32,10 @@
 #define eigthseconds (millis()/125) // Taring delay
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define OLED_WIDTH                       u8g2.getDisplayWidth()
-#define ALIGN_CENTER(t)                 ((OLED_WIDTH - (u8g2.getUTF8Width(t)))/2)
-#define ALIGN_RIGHT(t)                  (OLED_WIDTH -  u8g2.getUTF8Width(t))
-#define ALIGN_LEFT                      0
+// #define OLED_WIDTH                       u8g2.getDisplayWidth()
+// #define ALIGN_CENTER(t)                 ((OLED_WIDTH - (u8g2.getUTF8Width(t)))/2)
+// #define ALIGN_RIGHT(t)                  (OLED_WIDTH -  u8g2.getUTF8Width(t))
+// #define ALIGN_LEFT                      0
 
 //--------------------GLOBAL VARIABLES-----------------
 // pins:
@@ -78,14 +78,16 @@ void setup() {
   u8g2.setColorIndex(1);  // set the color to white
   u8g2.begin();
   u8g2.setBitmapMode(1);
+  
   delay(2000);
-  display.clearDisplay();
+  // display.clearDisplay();
 
   Serial.println("Startup is complete");
 
   // Output that startup is complete on display
   u8g2.setFont(u8g_font_7x14B);
-  u8g2WriteToDisplay(0,15,"Startup complete");
+  u8g2.setCursor(0, 15);
+  u8g2.print("Startup complete");
   // writeToDisplayCentre(2.5, WHITE, "Startup complete");
 
   while (!LoadCell.update());
@@ -95,7 +97,8 @@ void setup() {
 void loop() {
 
   static boolean newDataReady = 0;
-
+  
+  u8g2.clearBuffer();
   // check for new data/start next conversion:
   if (LoadCell.update()) newDataReady = true;
 
@@ -113,7 +116,8 @@ void loop() {
           if (LoadCell.getTareStatus() == true) {
             
             u8g2.setFont(u8g_font_7x14B);
-            u8g2WriteToDisplay(0,15,"Tare done");
+            u8g2.setCursor(0, 15);
+            u8g2.print("Tare done");
             // writeToDisplayCentre(2.5, WHITE, "Tare done");
             // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
@@ -126,7 +130,8 @@ void loop() {
       else if (reading>1){ //If a bird or heavy object is detected on the scale
           String reading_msg = String(reading) + "g";
           u8g2.setFont(u8g_font_7x14B);
-          u8g2WriteToDisplay(0,15,reading_msg.c_str());
+          u8g2.setCursor(0, 15);
+          u8g2.print(reading_msg.c_str());
           // writeToDisplayCentre(3, WHITE, reading_msg.c_str());
           // writeToDisplay(3, WHITE, 0, 4, reading_msg.c_str());
           Serial.println(String(num_readings) + "," + String(reading));
@@ -148,11 +153,14 @@ void loop() {
   if (LoadCell.getTareStatus() == true) {
     // writeToDisplayCentre(2.5, WHITE, "Tare done");
     u8g2.setFont(u8g_font_7x14B);
-    u8g2WriteToDisplay(0,15,"Tare done");
+    u8g2.setCursor(0, 15);
+    u8g2.print("tare done");
     // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
     Serial.println("Tare complete");
   }
+
+  u8g2.sendBuffer();
 
 }
 
@@ -183,7 +191,7 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
   display.display();
 }
 
-void u8g2WriteToDisplay(int cursorX, int cursorY, const char* text) {
+void u8g2WriteToDisplay(int cursorX, int cursorY, String text) {
       u8g2.setCursor(cursorX, cursorY);
       u8g2.print(text); 
 }
@@ -274,8 +282,10 @@ void calibrate() {
   // writeToDisplay(2, WHITE, 0, 10, "Calibration complete!");
   // writeToDisplayCentre(2, WHITE, "Calibration complete!");
   u8g2.setFont(u8g_font_7x14B);
-  u8g2WriteToDisplay(0,15,"Calibration");
-  u8g2WriteToDisplay(0,30,"complete!");
+  u8g2.setCursor(0, 15);
+  u8g2.print("Calibration");
+  u8g2.setCursor(0, 30);
+  u8g2.print("complete!");
 
   Serial.println("End calibration");
   Serial.println("***");

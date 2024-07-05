@@ -91,11 +91,11 @@ void setup() {
 }
 
 void loop() {
-  readCharacteristic->setValue(String(value)); // Updating value (placehoder)
-  String tareVal = tareCharacteristic->getValue(); 
+  readCharacteristic->setValue(String(value).c_str()); // Updating value (placeholder)
+  String tareVal = tareCharacteristic->getValue().c_str(); 
   Serial.print("Tare:");
   Serial.println(tareVal);
-  String calibrateVal = calibrateCharacteristic->getValue();
+  String calibrateVal = calibrateCharacteristic->getValue().c_str();
   Serial.print("Calibrate:");
   Serial.println(calibrateVal);
 
@@ -109,35 +109,35 @@ void loop() {
   }
   if (tareVal == "t") {
     Serial.println("Tare command received");
-    tareCharacteristic->setValue(okMSG);
+    tareCharacteristic->setValue(okMSG.c_str());
   }
   if (calibrateVal == "10") {
     Serial.println("Calibrate 10g command received");
-    calibrateCharacteristic->setValue(okMSG);
+    calibrateCharacteristic->setValue(okMSG.c_str());
     // If can't read from load cell, send fail
     // calibrateCharacteristic->setValue(nokMSG);
   }
   if (calibrateVal == "20") {
     Serial.println("Calibrate 20g command received");
-    calibrateCharacteristic->setValue(okMSG);
+    calibrateCharacteristic->setValue(okMSG.c_str());
     // If can't read from load cell, send fail
     // calibrateCharacteristic->setValue(nokMSG);    
   }  
   if (calibrateVal == "200") {
   Serial.println("Calibrate 200g command received");
-  calibrateCharacteristic->setValue(okMSG);
+  calibrateCharacteristic->setValue(okMSG.c_str());
     // If can't read from load cell, send fail
     // calibrateCharacteristic->setValue(nokMSG);  
   }
 
   else if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
     Serial.println("Unacceptable tare value received.");
-    calibrateCharacteristic->setValue(nokMSG);
+    calibrateCharacteristic->setValue(nokMSG.c_str());
   }  
 
   else if (calibrateVal != okMSG && calibrateVal != rstMSG && calibrateVal != "10" && calibrateVal != "20" && calibrateVal != "200" && calibrateVal != "calibrate") {
     Serial.println("Unacceptable calibrate value received.");
-    calibrateCharacteristic->setValue(nokMSG);
+    calibrateCharacteristic->setValue(nokMSG.c_str());
   }
   
     delay(1000);
