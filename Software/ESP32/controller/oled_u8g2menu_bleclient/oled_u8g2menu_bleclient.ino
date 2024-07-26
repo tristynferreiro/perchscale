@@ -28,6 +28,9 @@
 
 // BLE
 #include "BLEDevice.h"
+
+// // EEPROM
+// #include <EEPROM.h>
 //--------------------------------------------------
 
 
@@ -99,16 +102,19 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 1024 bytes]
 
+// EEPROM address
+const int calVal_eepromAdress = 0;
+
 // Menu variables
 
 const int NUM_ITEMS = 4; // number of items in the list
 const int MAX_ITEM_LENGTH = 10; // maximum characters for the item name
 
 char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
+  { "Connect" }, 
   { "Read" }, 
-  { "Tare" }, 
-  { "Calibrate" },
-  { "Connect" }
+  { "Tare" },
+  { "Calibrate" }
  };
 
 int current_screen = 0; // screen number which the menu is on
@@ -473,7 +479,7 @@ void loop() {
 
       // draw scrollbar handle
       u8g2.drawBox(125, 64/NUM_ITEMS * item_selected, 3, 64/NUM_ITEMS); 
-
+      // u8g2.writeBufferXBM(Serial);
       // draw bottom right logo
       // u8g2.drawXBMP(128-16-4, 64-4, 16, 4, upir_logo);               
 
@@ -507,7 +513,8 @@ void loop() {
         std::string value = readRemoteCharacteristic->readValue();
         Serial.print("Read value from server: ");
         Serial.println(value.c_str());
-        u8g2.print(value.c_str()); 
+        u8g2.drawStrX2(0, 32, value.c_str());
+        // u8g2.print(value.c_str()); 
       }else{
         process_screen = 3;
       } 
@@ -855,6 +862,22 @@ void loop() {
       display_counter++;     
     }
 
+    // Failed to save to EEPROM
+    else if ((current_screen == 2) && String(menu_items[item_selected])=="Calibrate" && process_screen == 9) { // TARE SCALE SUB-MENU SCREEN
+      Serial.println("In calibrate screen 2, process screen 9"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Failed to"); 
+      u8g2.setCursor(0, 30);
+      u8g2.print("save calVal."); 
+      if(display_counter == DELAY_COUNTER){ // Delay
+        process_screen = 0;
+        current_screen == 0;
+        display_counter = 0;
+      }
+      display_counter++;     
+    }
+
     // Calibration: Calibrate with 20g weight
     else if ((current_screen == 3) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
       Serial.println("In calibrate screen 3. Process screen 0"); // DEBUGGING CODE
@@ -977,27 +1000,98 @@ void loop() {
       u8g2.print("Saving calibration"); 
       u8g2.setCursor(0, 30);
       u8g2.print("value now...");          
-      //------------------------- SAVE CAL VAL -------------------------------   
-      Serial.println(display_counter);
-      if(display_counter == DELAY_COUNTER){ // If can save overall cal val
-        process_screen = 1;
-        display_counter = 0;
-        current_screen = 5;
+      //------------------------- SAVE CAL VAL -------------------------------
+      if (connected){
+        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        Serial.println(value.c_str());
+        static String saveMsg = "save";
+        calibrateRemoteCharacteristic->writeValue(saveMsg.c_str(),saveMsg.length()); // tell the server to begin saving value
+        Serial.println("save val sent to server");
+        current_screen = 5; process_screen = 1;
+      }else{
+        current_screen = 2;
+      process_screen = 4;
       }
-      display_counter++;
       //----------------------------------------------------------------------------     
-    }             
-    // Calibration: Complete calibration
+    }
+
+    // Calibration: Save calibration value
     else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 1) { // CALIBRATION SUB-MENU SCREEN
       Serial.println("In calibrate screen 5. Process screen 1"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Saving calibration"); 
+      u8g2.setCursor(0, 30);
+      u8g2.print("value now...");          
+      //------------------------- SAVE CAL VAL -------------------------------
+      if (connected){
+        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        Serial.println(value.c_str());
+        if(value == "ok"){
+          Serial.println("Sucessfully saved EEPROM value");
+          calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to resetcharacteristic value
+          current_screen = 5; process_screen = 2;
+        }else if (value =="nok"){
+          calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+          current_screen = 2; process_screen = 9;
+          Serial.println("FAILED to save Calibration Value");
+        }
+      }else{
+        current_screen = 2;
+      process_screen = 4;
+      }
+      //----------------------------------------------------------------------------     
+    }
+
+    // Calibration: Saved cal val to EEPROM
+    else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // CALIBRATION SUB-MENU SCREEN
+      Serial.println("In calibrate screen 5. Process screen 2"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Saved Calibration"); 
+      u8g2.setCursor(0, 30);
+      u8g2.print("Value to EEPROM");          
+      //------------------------- CONFIRMATION OF SAVE CAL VAL -------------------------------   
+      // If we are connected to a peer BLE Server, update the TARE characteristic
+      if (connected) { // Read values from server
+        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        Serial.println(value.c_str());
+        static String doneMsg = "done";
+        calibrateRemoteCharacteristic->writeValue(doneMsg.c_str(),doneMsg.length()); // tell the server to begin saving value
+        Serial.println("done val sent to server");
+        current_screen = 5; process_screen = 3;
+      }else{
+        current_screen = 2; process_screen = 4;
+      }
+      //----------------------------------------------------------------------------     
+    }   
+
+    // Calibration: Complete calibration
+    else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 3) { // CALIBRATION SUB-MENU SCREEN
+      Serial.println("In calibrate screen 5. Process screen 3"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
       u8g2.print("Calibration"); 
       u8g2.setCursor(0, 30);
       u8g2.print("Complete");          
-      //------------------------- SAVE CAL VAL -------------------------------   
+      //------------------------- SAVE CAL VAL ------------------------------- 
+      if (connected) { // Read values from server
+        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        Serial.println(value.c_str());
+        if(value == "ok"){
+          calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+          Serial.println("Calibration complete");
+        }else if (value =="nok"){
+          calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+          current_screen = 2; process_screen = 8;
+          Serial.println("FAILED to complete calibbration");
+        }
+      }else{
+        current_screen = 2; process_screen = 4;
+      }  
       Serial.println(display_counter);
-      if(display_counter == DELAY_COUNTER){ // Delay
+      // Delay
+      if(display_counter == DELAY_COUNTER/2){ // Delay
         process_screen = 0;
         display_counter = 0;
         current_screen = 0;

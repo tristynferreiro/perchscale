@@ -319,8 +319,34 @@ void loop() {
     if (calibrateVal == "save"){
       Serial.println("Saving Calibration value");
       // CAL SAVE CALIBRATE FUNCTION --> STILL NEEDS TO BE WRITTEN
+      if(!calibrate_complete_flag){
+      #if defined(ESP8266)|| defined(ESP32)
+        EEPROM.begin(512);
+      #endif
+        EEPROM.put(calVal_eepromAdress, calibration_points[2]);
+      #if defined(ESP8266)|| defined(ESP32)
+        EEPROM.commit();
+      #endif
+        EEPROM.get(calVal_eepromAdress, calibration_points[2]);
+        Serial.print("Value ");
+        Serial.print(calibration_points[2]);
+        Serial.print(" saved to EEPROM address: ");
+        Serial.println(calVal_eepromAdress);
+        // Set 'ok' for succesfully saving calibration value
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+        Serial.println("Wrote ok to characteristic");
+      }
     }
-    else if (calibrateVal != okMSG && calibrateVal != rstMSG && calibrateVal != "10" && calibrateVal != "20" && calibrateVal != "200" && calibrateVal != "calibrate") {
+
+    if (calibrateVal == "done") {
+      Serial.println("Calibrate DONE command received");
+      if(!calibrate_complete_flag){
+        Serial.println("Setting to ok");
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+    }
+
+    else if (calibrateVal != okMSG && calibrateVal != rstMSG && calibrateVal != "10" && calibrateVal != "20" && calibrateVal != "200" && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
       Serial.println("Unacceptable calibrate value received.");
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
