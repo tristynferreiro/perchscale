@@ -40,7 +40,7 @@
 
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
-#define MSG_BUFFER_SIZE 10000
+#define MSG_BUFFER_SIZE 100000
 #define file_name_path "/weight_readings_05062024_test.txt"
 //------------------------------------------------------
 //--------------------GLOBAL VARIABLES-----------------
@@ -392,6 +392,8 @@ void loop() {
           }
           if (LoadCell.getTareStatus() == true) {
             Serial.println("Next Tare Complete");
+            // Get current time from RTC
+            now = rtc.now();
             // Record tare event on SD card
             sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
             if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string

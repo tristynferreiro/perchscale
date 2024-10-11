@@ -1,7 +1,9 @@
 /*
-* SCRIPT DESCRIPTION
+* This script sets up a bleserver (tare, calibrate, read, connect) that communicates with the 
+* controller (ble client) script. However, the calibration procedure does not actually do multi-point
+* calibration despite instructing the reading of several weights.
 *
-* Working: 
+* Working: 10.10.2024
 *
 * Pin connections:
 *   SCL of OLED -> SCL (PIN 22) of ESP32
@@ -137,6 +139,7 @@ void setup() {
   display.clearDisplay();
   Serial.println("OLED Startup is complete");
 
+
   //----------BLE SERVER SETUP------------------------
   Serial.println("Starting BLE work!");
   BLEDevice::init("PerchScale");
@@ -208,7 +211,7 @@ void loop() {
     // Serial.print("Read:"); Serial.println(readVal);
 
     if (readVal == rstMSG) {
-      Serial.println("Resetting read value.");
+      Serial.println("Resetting read flag.");
       readCharacteristic->setValue("read"); // BLE: set characteristic
       status = "connected"; // OLED reset the status
     } 
@@ -273,7 +276,7 @@ void loop() {
       Serial.println("Tare complete");
     } 
     else if (tareVal == rstMSG) {
-      Serial.println("Resetting tare value.");
+      Serial.println("Resetting tare flag.");
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
       status = "connected"; // OLED reset the status
     }
@@ -284,7 +287,7 @@ void loop() {
     // Serial.println(calibrateVal);
 
     if (calibrateVal == rstMSG) {
-      Serial.println("Resetting calibrate value.");
+      Serial.println("Resetting calibrate flag.");
       calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
       calibrate_complete_flag = false;
     }
