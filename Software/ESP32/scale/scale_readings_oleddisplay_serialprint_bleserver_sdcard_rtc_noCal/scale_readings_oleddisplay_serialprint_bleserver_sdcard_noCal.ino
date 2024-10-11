@@ -178,7 +178,10 @@ void setup() {
   // Write PC time to RTC
   Serial.println("Setting RTC.");
   rtc.adjust(DateTime(__DATE__, __TIME__));
-
+  now = rtc.now();
+  char rtc_time_str[20];
+  sprintf(rtc_time_str, "%02d:%02d:%02d %02d/%02d/%02d",  now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+  Serial.println(rtc_time_str);
   Serial.println("RTC started.");
 
   //--------------------SD CARD SETUP-----------------------
@@ -313,6 +316,7 @@ void loop() {
                   appendFile(SD, file_name_path, msg);
                   strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
                   Serial.println("Written to file.");
+                  writeToDisplayCentre(3, WHITE, "Written to file.");
                 }
                 _resume = true;
                 // delay(2000);
@@ -322,7 +326,6 @@ void loop() {
           else if (reading>1){ //If a bird or heavy object is detected on the scale
               // Get current time from RTC
               now = rtc.now();
-
               // Append the reading to the buffer
               sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
               Serial.println(msg);
@@ -333,6 +336,7 @@ void loop() {
                 strcpy(msg, "");
                 //memset(msg, 0, MSG_BUFFER_SIZE);
                 Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
+                writeToDisplayCentre(3, WHITE, "Written to file.");
               }
               String reading_msg = String(reading) + "g";
              
@@ -364,6 +368,8 @@ void loop() {
 
       writeToDisplayCentre(2.5, WHITE, "Tare done");
       
+      // Get current time from RTC
+      now = rtc.now();
       // Record tare event
       sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
       Serial.println(msg);
@@ -374,6 +380,7 @@ void loop() {
         strcpy(msg, "");
         //memset(msg, 0, MSG_BUFFER_SIZE);
         Serial.println("Written to file.");
+        writeToDisplayCentre(3, WHITE, "Written to file.");
       }
 
       tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
@@ -487,6 +494,18 @@ void loop() {
               writeToDisplayCentre(2.5, WHITE, "Tare done");
               // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
+              // Get current time from RTC
+              now = rtc.now();
+              // Record tare event on SD card
+              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+              if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
+                // Save to text file on SD card
+                appendFile(SD, file_name_path, msg);
+                strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
+                Serial.println("Written to file.");
+                writeToDisplayCentre(3, WHITE, "Written to file.");
+              }
+
               Serial.println("Next Tare Complete");
               _resume = true;
               // delay(2000);
@@ -496,7 +515,9 @@ void loop() {
         else if (reading>1){ //If a bird or heavy object is detected on the scale
             String reading_msg = String(reading) + "g";
             writeToDisplayCentre(3, WHITE, reading_msg.c_str());
-
+            
+            // Get current time from RTC
+            now = rtc.now();
             // Append the reading to the buffer
             sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
             Serial.println(msg);
@@ -507,8 +528,7 @@ void loop() {
               strcpy(msg, "");
               //memset(msg, 0, MSG_BUFFER_SIZE);
               Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
-
-              readCharacteristic->setValue(String(reading_msg).c_str()); // BLE: Updating value to scale reading
+              writeToDisplayCentre(3, WHITE, "Written to file.");
             }  
             newDataReady = 0;
             data_num_readings++;
@@ -521,6 +541,8 @@ void loop() {
       writeToDisplayCentre(2.5, WHITE, "Tare done");
       // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
+      // Get current time from RTC
+      now = rtc.now();
       // Record tare event
       sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
       if(MSG_BUFFER_SIZE-strlen(msg)<=28){
@@ -529,6 +551,7 @@ void loop() {
         strcpy(msg, "");
         //memset(msg, 0, MSG_BUFFER_SIZE);
         Serial.println("Written to file.");
+        writeToDisplayCentre(3, WHITE, "Written to file.");
       }
        
       Serial.println("Tare complete");
