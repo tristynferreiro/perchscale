@@ -21,6 +21,11 @@
 *   Vcc of SD module -> 5V of ESP32
 *   GND of SD module -> GND of ESP32
 *   ----* SD card needs to be FAT16 or FAT32 formatted.
+*
+*   SCL of RTC -> SCL (PIN 22) of ESP32
+*   SDA of RTC -> SDA (PIN 21) of ESP32
+*   GND of RTC -> GND of ESP32
+*   Vcc of RTC -> 5V of ESP32
 */
 
 //------------------INCLUDES------------------------
@@ -84,7 +89,7 @@ DateTime now;
 
 // SD card msg
 char msg[MSG_BUFFER_SIZE];
-char calibrate_msg[1000];
+char calibrate_msg[2000];
 
 // EEPROM address
 const int calVal_eepromAdress = 0;
@@ -203,6 +208,7 @@ void setup() {
   // Create the storage file
   //createDir(SD, file_name_path);
   writeFile(SD, file_name_path, "Start\n"); // create the file
+  writeFile(SD, calibrate_file_name_path, "Start\n"); // create the file
 
 
   //----------BLE SERVER SETUP------------------------
@@ -359,7 +365,7 @@ void loop() {
     // Serial.println(tareVal);
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
       Serial.println("Unacceptable tare value received.");
-      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
+      tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     } 
     if (tareVal == "t") {
       status = "tare"; // OLED set the status
@@ -409,6 +415,7 @@ void loop() {
      
       if(!calibrate_complete_flag){
         calibrate(calibrateVal.toFloat());
+        
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
       // If can't read from load cell, send fail
@@ -433,25 +440,37 @@ void loop() {
       // calibrateCharacteristic->setValue(nokMSG);  
     }
     if (calibrateVal == "save"){
-      Serial.println("Saving Calibration value");
+      Serial.println("Saving Calibration point values");
+
+      sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+      // Save to text file on SD card
+      appendFile(SD, calibrate_file_name_path, calibrate_msg);
+      strcpy(calibrate_msg, "");
+      //memset(msg, 0, MSG_BUFFER_SIZE);
+      Serial.println("Written to file.");
+      writeToDisplayCentre(3, WHITE, "Written to file.");
+      
+      // Set 'ok' for succesfully saving calibration value
+      calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      Serial.println("Wrote ok to characteristic");
+
       // CAL SAVE CALIBRATE FUNCTION --> STILL NEEDS TO BE WRITTEN
-      if(!calibrate_complete_flag){
-      #if defined(ESP8266)|| defined(ESP32)
-        EEPROM.begin(512);
-      #endif
-        EEPROM.put(calVal_eepromAdress, calibration_points[2]);
-      #if defined(ESP8266)|| defined(ESP32)
-        EEPROM.commit();
-      #endif
-        EEPROM.get(calVal_eepromAdress, calibration_points[2]);
-        Serial.print("Value ");
-        Serial.print(calibration_points[2]);
-        Serial.print(" saved to EEPROM address: ");
-        Serial.println(calVal_eepromAdress);
-        // Set 'ok' for succesfully saving calibration value
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-        Serial.println("Wrote ok to characteristic");
-      }
+      // if(!calibrate_complete_flag){
+      // #if defined(ESP8266)|| defined(ESP32)
+      //   EEPROM.begin(512);
+      // #endif
+      //   EEPROM.put(calVal_eepromAdress, calibration_points[2]);
+      // #if defined(ESP8266)|| defined(ESP32)
+      //   EEPROM.commit();
+      // #endif
+      //   EEPROM.get(calVal_eepromAdress, calibration_points[2]);
+      //   Serial.print("Value ");
+      //   Serial.print(calibration_points[2]);
+      //   Serial.print(" saved to EEPROM address: ");
+      //   Serial.println(calVal_eepromAdress);
+        
+
+        
     }
 
     if (calibrateVal == "done") {
@@ -468,7 +487,7 @@ void loop() {
     }
     
     delay(200);
-  }
+  } // End of case where device is connected
   //----------STANDBY MODE------------------------
   // If no controller is connected, read values and save to SD card (no OLED)
   else if(!deviceConnected){
@@ -556,10 +575,9 @@ void loop() {
        
       Serial.println("Tare complete");
     }
-  }
+  } // End of case where device is not connected
   
-
-}
+} // End of main loop
 
 //------------------HELPER FUNCTIONS------------------------
 void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* msgToPrint) {
@@ -608,14 +626,16 @@ void calibrate(float calibration_weight) {
   }
 
   LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correctly
-  float newCalibrationValue = LoadCell.getNewCalibration(known_mass); //get the new calibration value
-  Serial.println("Calibration value = " + String(newCalibrationValue));
+  // float newCalibrationValue = LoadCell.getNewCalibration(known_mass); //get the new calibration value
+  // Serial.println("Calibration value = " + String(newCalibrationValue));
   
-  // Store the point in the calibration array
-  calibration_points[calibration_num_points] = newCalibrationValue; 
-  calibration_num_points += 1;
+  // // Store the point in the calibration array
+  // calibration_points[calibration_num_points] = LoadCell.getData();
+  // 
+  float calibration_value = LoadCell.getData();
+  sprintf(calibrate_msg, "%s,%s,%f", calibrate_msg, String(calibration_weight), calibration_value); 
   calibrate_complete_flag = true;
-
+  Serial.println(calibrate_msg);
   Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
   Serial.println("***");
 //   Serial.print("New calibration value has been set to: ");
