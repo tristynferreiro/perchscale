@@ -353,6 +353,30 @@
           "label": "LCSC",
           "name": "LCSC",
           "show": true
+        },
+        {
+          "group_by": false,
+          "label": "Price",
+          "name": "Price",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Extended",
+          "name": "Extended",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Sim.Device",
+          "name": "Sim.Device",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Sim.Pins",
+          "name": "Sim.Pins",
+          "show": false
         }
       ],
       "filter_string": "",
@@ -404,6 +428,10 @@
     [
       "493450dd-c9ed-4caa-b403-c48847e00670",
       "Root"
+    ],
+    [
+      "a8fb4a8f-8fe1-4bcb-8599-3467a357776b",
+      "HX711"
     ]
   ],
   "text_variables": {}
