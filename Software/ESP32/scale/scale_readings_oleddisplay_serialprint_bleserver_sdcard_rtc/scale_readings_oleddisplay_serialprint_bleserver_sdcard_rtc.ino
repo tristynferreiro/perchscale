@@ -89,7 +89,7 @@ DateTime now;
 
 // SD card msg
 char msg[MSG_BUFFER_SIZE];
-char calibrate_msg[2000];
+char calibrate_msg[2000] ="";
 
 // EEPROM address
 const int calVal_eepromAdress = 0;
@@ -633,7 +633,13 @@ void calibrate(float calibration_weight) {
   // calibration_points[calibration_num_points] = LoadCell.getData();
   // 
   float calibration_value = LoadCell.getData();
-  sprintf(calibrate_msg, "%s,%s,%f", calibrate_msg, String(calibration_weight), calibration_value); 
+  if(calibration_weight != float(10)){ 
+    sprintf(calibrate_msg, "%s,%s,%f", calibrate_msg, String(calibration_weight), calibration_value); 
+  }
+  else {
+    sprintf(calibrate_msg, "%s,%f", String(calibration_weight), calibration_value); 
+  }
+  
   calibrate_complete_flag = true;
   Serial.println(calibrate_msg);
   Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
