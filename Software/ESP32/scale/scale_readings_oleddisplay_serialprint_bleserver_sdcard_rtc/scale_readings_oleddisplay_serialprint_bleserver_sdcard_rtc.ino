@@ -56,8 +56,8 @@
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
 #define MSG_BUFFER_SIZE 1000 
-#define file_name_path "/weight_readings_11102024_test.txt"
-#define calibrate_file_name_path "/calibrate_values_11102024_test.txt"
+#define file_name_path "/weight_readings_21102024.txt"
+#define calibrate_file_name_path "/calibrate_values_21102024.txt"
 
 // OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -316,7 +316,7 @@ void loop() {
                 // Get current time from RTC
                 now = rtc.now();
                 // Record tare event on SD card
-                sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+                sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
                 if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
                   // Save to text file on SD card
                   appendFile(SD, file_name_path, msg);
@@ -333,7 +333,7 @@ void loop() {
               // Get current time from RTC
               now = rtc.now();
               // Append the reading to the buffer
-              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
+              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
               Serial.println(msg);
               Serial.println(String(strlen(msg)));
               if(MSG_BUFFER_SIZE-strlen(msg)<=28){
@@ -377,7 +377,7 @@ void loop() {
       // Get current time from RTC
       now = rtc.now();
       // Record tare event
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
+      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
       Serial.println(msg);
       Serial.println(String(strlen(msg)));
       if(MSG_BUFFER_SIZE-strlen(msg)<=28){
@@ -444,8 +444,8 @@ void loop() {
 
       sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
       // Save to text file on SD card
+      appendFile(SD, calibrate_file_name_path, calibrate_msg);
       appendFile(SD, file_name_path, calibrate_msg);
-      appendFile(SD, data_file_name_path, calibrate_msg);
       strcpy(calibrate_msg, "");
       //memset(msg, 0, MSG_BUFFER_SIZE);
       Serial.println("Written to file.");
@@ -454,24 +454,6 @@ void loop() {
       // Set 'ok' for succesfully saving calibration value
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       Serial.println("Wrote ok to characteristic");
-
-      // CAL SAVE CALIBRATE FUNCTION --> STILL NEEDS TO BE WRITTEN
-      // if(!calibrate_complete_flag){
-      // #if defined(ESP8266)|| defined(ESP32)
-      //   EEPROM.begin(512);
-      // #endif
-      //   EEPROM.put(calVal_eepromAdress, calibration_points[2]);
-      // #if defined(ESP8266)|| defined(ESP32)
-      //   EEPROM.commit();
-      // #endif
-      //   EEPROM.get(calVal_eepromAdress, calibration_points[2]);
-      //   Serial.print("Value ");
-      //   Serial.print(calibration_points[2]);
-      //   Serial.print(" saved to EEPROM address: ");
-      //   Serial.println(calVal_eepromAdress);
-        
-
-        
     }
 
     if (calibrateVal == "done") {
@@ -492,6 +474,9 @@ void loop() {
   //----------STANDBY MODE------------------------
   // If no controller is connected, read values and save to SD card (no OLED)
   else if(!deviceConnected){
+    // Save the readings to file on SD card
+    appendFile(SD, file_name_path, msg); // Save the readings to file on SD card
+
     static boolean newDataReady = 0;
 
     // check for new data/start next conversion:
@@ -517,7 +502,7 @@ void loop() {
               // Get current time from RTC
               now = rtc.now();
               // Record tare event on SD card
-              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
               if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
                 // Save to text file on SD card
                 appendFile(SD, file_name_path, msg);
@@ -539,7 +524,7 @@ void loop() {
             // Get current time from RTC
             now = rtc.now();
             // Append the reading to the buffer
-            sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
+            sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
             Serial.println(msg);
             Serial.println(String(strlen(msg)));
             if(MSG_BUFFER_SIZE-strlen(msg)<=28){
@@ -564,7 +549,7 @@ void loop() {
       // Get current time from RTC
       now = rtc.now();
       // Record tare event
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
+      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
       if(MSG_BUFFER_SIZE-strlen(msg)<=28){
         // Save to text file on SD card
         appendFile(SD, file_name_path, msg);
