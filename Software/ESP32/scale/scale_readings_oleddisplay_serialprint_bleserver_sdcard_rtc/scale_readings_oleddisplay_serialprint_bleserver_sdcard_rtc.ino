@@ -444,7 +444,8 @@ void loop() {
 
       sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
       // Save to text file on SD card
-      appendFile(SD, calibrate_file_name_path, calibrate_msg);
+      appendFile(SD, file_name_path, calibrate_msg);
+      appendFile(SD, data_file_name_path, calibrate_msg);
       strcpy(calibrate_msg, "");
       //memset(msg, 0, MSG_BUFFER_SIZE);
       Serial.println("Written to file.");

@@ -108,7 +108,7 @@ const int calVal_eepromAdress = 0;
 // Menu variables
 
 const int NUM_ITEMS = 5; // number of items in the list
-const int MAX_ITEM_LENGTH = 10; // maximum characters for the item name
+const int MAX_ITEM_LENGTH = 11; // maximum characters for the item name
 
 char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Connect" }, 
@@ -139,6 +139,7 @@ int button_back_clicked = 0; // same as above
 // ************* BLE CLIENT ******************************
 static String rstMsg = "rst";
 // Connect service:
+BLEClient*  pClient;
 // The remote service we wish to connect to.
 static BLEUUID connectServiceUUID("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
 // The characteristic of the remote service we are interested in.
@@ -189,7 +190,7 @@ bool connectToServer() {
     Serial.print("Forming a connection to ");
     Serial.println(myDevice->getAddress().toString().c_str());
     
-    BLEClient*  pClient  = BLEDevice::createClient();
+    pClient  = BLEDevice::createClient();
     Serial.println(" - Created client");
 
     pClient->setClientCallbacks(new MyClientCallback());
@@ -228,11 +229,12 @@ bool connectToServer() {
       Serial.println(value.c_str());
     }
 
-    if(pRemoteCharacteristic->canNotify())
+    if(pRemoteCharacteristic->canNotify()) {
       pRemoteCharacteristic->registerForNotify(notifyCallback);
+    }
 
     connected = true;
-
+    
     //---------------------WEIGH SERVICE----------------
     BLERemoteService* weighRemoteService = pClient->getService(weighServiceUUID);
     if (weighRemoteService == nullptr) {
@@ -1192,63 +1194,48 @@ void loop() {
     //------------------------- DISCONNECT -------------------------------   
     else if ((current_screen == 1) && connected && String(menu_items[item_selected])=="Disconnect"  && process_screen == 0) { // SCALE SUB-MENU SCREEN
       Serial.println("In Disconnect screen"); // DEBUGGING CODE
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.println("Disconnecting");
-      u8g2.setCursor(0, 30);
-      u8g2.println("from scale...");
       Serial.print("Attempting to disconnecting from  ");
       Serial.println(myDevice->getAddress().toString().c_str());
 
-      // Disconnect from the remove BLE Server.
+      // Disconnect from the BLE Server.
       pClient->disconnect();
-      Serial.println(connected);
-      if (!connected) {
-        Serial.println("Sucessfully disconnected from BLE server.");
-        process_screen =1; // Move to next screen
-        }
-      else { // IF failed to connect --> NEXT SCREEN
-          Serial.println("Failed to disconnect from server.");
-          process_screen=2;
-        }
+     
+      process_screen = 1;
+      //----------------------------------------------------------------------------
+    }// Sucessfullly disconnected
+    else if ((current_screen == 1) && !connected && String(menu_items[item_selected])=="Disconnect"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
+       Serial.println("Disconnected");
+       
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Successfully");
+       u8g2.setCursor(0, 30);
+       u8g2.print("disconnected.");
+       if(display_counter == DELAY_COUNTER){ // Exit to main menu
+        current_screen = 0;
+        process_screen = 0;
+        display_counter = 0;
       }
+        display_counter++;
+      //----------------------------------------------------------------------------
+    }// Unsucessfullly disconnected
+    else if ((current_screen == 1) && connected && String(menu_items[item_selected])=="Disconnect"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
+       Serial.println("Disconnected");
+       
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Still");
+       u8g2.setCursor(0, 30);
+       u8g2.print("connected.");
+       if(display_counter == DELAY_COUNTER){ // Exit to main menu
+        current_screen = 0;
+        process_screen = 0;
+        display_counter = 0;
+      }
+        display_counter++;
       //----------------------------------------------------------------------------
     }
-    // Sucessfullly disconnected
-    else if ((current_screen == 1) && String(menu_items[item_selected])=="Connect" && process_screen ==1) { // SCALE SUB-MENU SCREEN
-      Serial.println("Disconnected");
-      // u8g2.clear();
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.print("Successfully");
-      u8g2.setCursor(0, 30);
-      u8g2.print("disconnected.");
-      if(display_counter == DELAY_COUNTER){ // Exit to main menu
-        current_screen = 0;
-        process_screen = 0;
-        display_counter = 0;
-      }
-      display_counter++;
-    }
-    // Failed to disconnect. Go to main screen
-    else if ((current_screen == 1) && String(menu_items[item_selected])=="Connect" && process_screen ==2) { // SCALE SUB-MENU SCREEN
-      Serial.println("Disconnect failed");
-      // u8g2.clear();
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.print("Disconnect Failed.");
-      u8g2.setCursor(0, 30);
-      u8g2.print("Going home...");
-      if(display_counter == DELAY_COUNTER){ // Exit to main menu
-        current_screen = 0;
-        process_screen = 0;
-        display_counter = 0;
-      }
-      display_counter++;
-    }
-
 
   u8g2.sendBuffer(); // send buffer from RAM to display controller
-
 
 }
