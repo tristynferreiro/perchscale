@@ -425,7 +425,10 @@ void loop() {
     current_screen = 7;}
     else if (current_screen == 2 && process_screen == 7 && calibrate_weight == 265 && String(menu_items[item_selected])=="Calibrate") {
     process_screen = 0;
-    current_screen = 5;}        
+    current_screen = 5;} 
+    else if (current_screen == 2 && process_screen == 7 && String(menu_items[item_selected])=="Calibrate") {
+    process_screen = 0;
+    current_screen = 0;}        
     else if (current_screen == 3 && process_screen ==0 && String(menu_items[item_selected])=="Calibrate") {
       current_screen = 3;
       process_screen = 1;}
