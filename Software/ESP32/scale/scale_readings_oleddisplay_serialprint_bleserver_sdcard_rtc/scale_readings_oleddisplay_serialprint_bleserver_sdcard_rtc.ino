@@ -116,9 +116,7 @@ char rtc_time_str[TIME_STRING_SIZE];
 
 // SD card msg
 char msg[MSG_BUFFER_SIZE];
-char calibrate_msg[2000];
-
-
+char calibrate_msg[1000];
 
 int data_num_readings = 0; // scale readings counter
 // BLE Server
@@ -357,7 +355,6 @@ void loop() {
       status = "connected"; // OLED reset the status
     } 
     else if (readVal != "read" && readVal != rstMSG) {
-      // Serial.println("Reading scale: ");
       static boolean newDataReady = 0;
 
       // check for new data/start next conversion:
@@ -405,8 +402,7 @@ void loop() {
               now = rtc.now();
               // Append the reading to the buffer
               sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
-              // Serial.println(msg);
-              // Serial.println(String(strlen(msg)));
+            
               if(MSG_BUFFER_SIZE-strlen(msg)<=28){
                 // Save to text file on SD card
                 appendFile(SD, file_name_path, msg);
@@ -432,8 +428,7 @@ void loop() {
 
     //*********** CONTROLLER Tare
     String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
-    // Serial.print("Tare:");
-    // Serial.println(tareVal);
+
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
       Serial.println("Unacceptable tare value received.");
       tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
@@ -449,8 +444,7 @@ void loop() {
       now = rtc.now();
       // Record tare event
       sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
-      // Serial.println(msg);
-      // Serial.println(String(strlen(msg)));
+
       if(MSG_BUFFER_SIZE-strlen(msg)<=28){
         // Save to text file on SD card
         appendFile(SD, file_name_path, msg);
@@ -471,8 +465,6 @@ void loop() {
 
     //*********** CONTROLLER Calibrate 
     String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
-    // Serial.print("Calibrate:");
-    // Serial.println(calibrateVal);
 
     if (calibrateVal == rstMSG) {
       Serial.println("Resetting calibrate flag.");
@@ -480,76 +472,64 @@ void loop() {
       calibrate_complete_flag = false;
     }
 
-
-    if (calibrateVal == calibration_weights[1]) {
+    if (calibrateVal.equals(calibration_weights[0])) {
+      Serial.println(String("Calibrate ")+ calibration_weights[0] + String("command received"));
+     
+      if(!calibrate_complete_flag){
+        calibrate(calibrateVal);
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+    }
+    if (calibrateVal.equals(calibration_weights[1])) {
       Serial.println(String("Calibrate ")+ calibration_weights[1] + String("command received"));
      
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
-        
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);
     }
-    if (calibrateVal == calibration_weights[2]) {
+    if (calibrateVal.equals(calibration_weights[2])) {
       Serial.println(String("Calibrate ")+ calibration_weights[2] + String("command received"));
+     
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);    
-    }  
-    if (calibrateVal == calibration_weights[3]) {
+    }
+    if (calibrateVal.equals(calibration_weights[3])) {
       Serial.println(String("Calibrate ")+ calibration_weights[3] + String("command received"));
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);  
     }
-    if (calibrateVal == calibration_weights[4]) {
+    if (calibrateVal.equals(calibration_weights[4])) {
       Serial.println(String("Calibrate ")+ calibration_weights[4] + String("command received"));
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);  
     }
-    if (calibrateVal == calibration_weights[5]) {
+    if (calibrateVal.equals(calibration_weights[5])) {
       Serial.println(String("Calibrate ")+ calibration_weights[5] + String("command received"));
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);  
     }
-    if (calibrateVal == calibration_weights[6]) {
+    if (calibrateVal.equals(calibration_weights[6])) {
       Serial.println(String("Calibrate ")+ calibration_weights[6] + String("command received"));
+     
       if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
+        calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);  
-    }
-    if (calibrateVal == calibration_weights[7]) {
-      Serial.println(String("Calibrate ")+ calibration_weights[7] + String("command received"));
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal.toFloat());
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-      // If can't read from load cell, send fail
-      // calibrateCharacteristic->setValue(nokMSG);  
     }
     if (calibrateVal == "save"){
       Serial.println("Saving Calibration point values");
 
-      sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+      sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+      Serial.println(strlen(calibrate_msg));
       // Save to text file on SD card
       appendFile(SD, calibrate_file_name_path, calibrate_msg);
       appendFile(SD, file_name_path, calibrate_msg);
@@ -571,7 +551,7 @@ void loop() {
       }
     }
 
-    else if (calibrateVal != okMSG && calibrateVal != rstMSG && calibrateVal != "10" && calibrateVal != "20" && calibrateVal != "200" && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
+    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
       Serial.println("Unacceptable calibrate value received.");
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
@@ -700,45 +680,29 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
 }
 
 
-void calibrate(float calibration_weight) {
+void calibrate(String calibration_weight) {
   writeToDisplayCentre(2, WHITE, "Calibrating...");
 
   Serial.println("***");
-  Serial.println("Starting calibration for "+ String(calibration_weight) + "g");
-
-  // Taring has been done before this method is called
-
-  float known_mass = calibration_weight;
-  bool _resume = false;
-  while (_resume == false) {
-    LoadCell.update();
-    if (known_mass != 0) {
-      Serial.println("Known mass is: " + String(known_mass));
-       _resume = true;
-    }  
-  }
-
-  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correctly
-  // float newCalibrationValue = LoadCell.getNewCalibration(known_mass); //get the new calibration value
-  // Serial.println("Calibration value = " + String(newCalibrationValue));
+  Serial.println("Starting calibration for "+ calibration_weight + "g");
   
-  // // Store the point in the calibration array
-  // calibration_points[calibration_num_points] = LoadCell.getData();
-  // 
+  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
+  
   float calibration_value = LoadCell.getData();
-  if(calibration_weight != atof(calibration_weights[1])){ 
-    sprintf(calibrate_msg, "%s,%s,%f", calibrate_msg, String(calibration_weight), calibration_value); 
+  Serial.println(calibration_value);
+  if(!calibration_weight.equals(calibration_weights[0])){ 
+    sprintf(calibrate_msg, "%s,%s,%.2f", calibrate_msg, calibration_weight, calibration_value); 
   }
   else {
-    sprintf(calibrate_msg, "%s,%f", String(calibration_weight), calibration_value); 
+    sprintf(calibrate_msg, "%s,%.2f", calibration_weight, calibration_value); 
     
     // Update the reading threshold value based on the lowest calibration value
+    reading_threshold = calibration_value; 
     #if defined(ESP8266)|| defined(ESP32)
       EEPROM.begin(512);
       EEPROM.put(calVal_eepromAdress, reading_threshold);
       EEPROM.commit();
-      Serial.print("Threshold value is ");
-      Serial.print( EEPROM.get(calVal_eepromAdress, reading_threshold));
+      Serial.println("Threshold value is "+ String(EEPROM.get(calVal_eepromAdress, reading_threshold)));
     #endif
   }
 
