@@ -55,7 +55,7 @@
 
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
-#define MSG_BUFFER_SIZE 1000 
+#define MSG_BUFFER_SIZE 4000 
 #define TIME_STRING_SIZE 11
 
 // OLED
@@ -119,7 +119,7 @@ int old_hour; // This is used to check if a new file needs to be created on the 
 char msg[MSG_BUFFER_SIZE];
 char calibrate_msg[1000];
 
-int data_num_readings = 0; // scale readings counter
+int data_num_readings = 1; // scale readings counter
 // BLE Server
 bool deviceConnected = false;
 int value = 0;
@@ -136,24 +136,24 @@ String status = "-1";
 class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
-      Serial.println("Device Connected.");
+      Serial.println("BLE: Device Connected.");
       status = "connected"; // OLED set the status
     };
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
       status = "-1"; // OLED reset the status
-      Serial.println("Device Disconnected.");
+      Serial.println("BLE: Device Disconnected.");
       delay(500); // give the bluetooth stack the chance to get things ready
 
       // RESET ALL CHARACTERISTICS
       readCharacteristic->setValue("read");
       tareCharacteristic->setValue("tare"); 
       calibrateCharacteristic->setValue("calibrate"); 
-      Serial.println("Reset characteristics");
+      Serial.println("BLE: Reset characteristics.");
 
       BLEDevice::startAdvertising();
-      Serial.println("Started re-advertising.");
+      Serial.println("BLE: Started re-advertising.");
 
 
     }
@@ -165,8 +165,8 @@ void updateFilePath(fs::FS &fs, DateTime now){
   sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
   
   // Print the file names
-  Serial.println(file_name_path);
-  Serial.println(calibrate_file_name_path);
+  Serial.println("Data file path: " + String(file_name_path));
+  Serial.println("Calibration values file path: " + String(calibrate_file_name_path));
     
   // Check if the file already exists so that it is not overwritten
   File file = fs.open(file_name_path, FILE_APPEND);
@@ -326,10 +326,16 @@ void calibrate(String calibration_weight) {
 //   Serial.println("End change calibration value");
 //   Serial.println("***");
 // }
-//------------------------------------------------------
 
+//*******************************************************************************************************************************
+//*******************************************************************************************************************************
+//*******************************************************************************************************************************
+//*******************************************************************************************************************************
 void setup() {
-  // SERIAL SETUP
+  Serial.println("\n*************************");
+  Serial.println("Beginning startup routine.");
+
+  //----------SERIAL SETUP------------------------
   Serial.begin(9600); // Initialise baud rate with PC
   
   //----------LOADCELL SETUP------------------------
@@ -354,10 +360,8 @@ void setup() {
   if(isnan(reading_threshold)){
     reading_threshold = 1; // ADJUST ACCORDING TO WHAT MAKES SENSE
   }
-  Serial.println("Threshold value is ");
-  Serial.print(reading_threshold);
-
-  Serial.println("Loadcell Startup is complete");
+  Serial.println("\nReading threshold value is " + String(reading_threshold));
+  Serial.println("Loadcell startup is complete");
 
   //----------OLED SETUP------------------------
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
@@ -366,7 +370,7 @@ void setup() {
   }
   delay(2000);
   display.clearDisplay();
-  Serial.println("OLED Startup is complete");
+  Serial.println("OLED startup completed.");
 
   //--------------------RTC SETUP-----------------------
   Wire.begin(); // required by the RTClib library because I2C is used
@@ -378,7 +382,7 @@ void setup() {
   }
 
   // Write PC time to RTC
-  Serial.println("Setting RTC.");
+  Serial.println("Setting RTC using connected PC.");
   rtc.adjust(DateTime(__DATE__, __TIME__));
   
   now = rtc.now();
@@ -428,7 +432,6 @@ void setup() {
 
 
   //----------BLE SERVER SETUP------------------------
-  Serial.println("Starting BLE work!");
   BLEDevice::init("PerchScale");
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
@@ -469,14 +472,13 @@ void setup() {
   pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
-  Serial.println("Characteristic defined! Now you can read it in your phone!");
+  Serial.println("BLE startup is complete. Characteristics are defined and advertised.");
   // ----------------------------------------------- 
 
   // Output that startup is complete on display
   writeToDisplayCentre(2.5, WHITE, "Startup complete");
 
-  //while (!LoadCell.update());
-  //calibrate(); //start calibration procedure
+  Serial.println("*************************");
 };
 
 void loop() {
@@ -503,7 +505,7 @@ void loop() {
     // Serial.print("Read:"); Serial.println(readVal);
 
     if (readVal == rstMSG) {
-      Serial.println("Resetting read flag.");
+      Serial.println("Read mode: Resetting read flag.");
       readCharacteristic->setValue("read"); // BLE: set characteristic
       status = "connected"; // OLED reset the status
     } 
@@ -532,18 +534,17 @@ void loop() {
                 writeToDisplayCentre(2.5, WHITE, "Tare done");
                 // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
 
-                Serial.println("Next Tare Complete");
+                Serial.println("Read mode: Next Tare Complete");
                 
                 // Get current time from RTC
                 now = rtc.now();
                 // Record tare event on SD card
                 sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-                if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
+                if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
                   // Save to text file on SD card
                   appendFile(SD, file_name_path, msg);
                   strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
-                  Serial.println("Written to file.");
-                  writeToDisplayCentre(3, WHITE, "Written to file.");
+                  Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
                 }
                 _resume = true;
                 // delay(2000);
@@ -556,13 +557,12 @@ void loop() {
               // Append the reading to the buffer
               sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
             
-              if(MSG_BUFFER_SIZE-strlen(msg)<=28){
+              if(MSG_BUFFER_SIZE-strlen(msg)<=30){
                 // Save to text file on SD card
                 appendFile(SD, file_name_path, msg);
                 strcpy(msg, "");
                 //memset(msg, 0, MSG_BUFFER_SIZE);
-                Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
-                writeToDisplayCentre(3, WHITE, "Written to file.");
+                Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
               }
               String reading_msg = String(reading) + "g";
              
@@ -583,12 +583,12 @@ void loop() {
     String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
 
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
-      Serial.println("Unacceptable tare value received.");
+      Serial.println("Tare mode: Unacceptable tare value received.");
       tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     } 
     if (tareVal == "t") {
       status = "tare"; // OLED set the status
-      Serial.println("Tare command received");
+      Serial.println("Tare mode: Tare command received");
       LoadCell.tareNoDelay(); //tare
 
       writeToDisplayCentre(2.5, WHITE, "Tare done");
@@ -598,20 +598,20 @@ void loop() {
       // Record tare event
       sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
 
-      if(MSG_BUFFER_SIZE-strlen(msg)<=28){
+      if(MSG_BUFFER_SIZE-strlen(msg)<=30){
         // Save to text file on SD card
         appendFile(SD, file_name_path, msg);
         strcpy(msg, "");
         //memset(msg, 0, MSG_BUFFER_SIZE);
-        Serial.println("Written to file.");
+        Serial.println("Tare mode: Written to file.");
         writeToDisplayCentre(3, WHITE, "Written to file.");
       }
 
       tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
-      Serial.println("Tare complete");
+      Serial.println("Tare mode: Tare complete");
     } 
     else if (tareVal == rstMSG) {
-      Serial.println("Resetting tare flag.");
+      Serial.println("Tare mode: Resetting tare flag.");
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
       status = "connected"; // OLED reset the status
     }
@@ -620,13 +620,13 @@ void loop() {
     String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
     if (calibrateVal == rstMSG) {
-      Serial.println("Resetting calibrate flag.");
+      Serial.println("Calibrate mode: Resetting calibrate flag.");
       calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
       calibrate_complete_flag = false;
     }
 
     if (calibrateVal.equals(calibration_weights[0])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[0] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[0] + String("command received"));
      
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
@@ -634,7 +634,7 @@ void loop() {
       }
     }
     if (calibrateVal.equals(calibration_weights[1])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[1] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[1] + String("command received"));
      
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
@@ -642,7 +642,7 @@ void loop() {
       }
     }
     if (calibrateVal.equals(calibration_weights[2])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[2] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[2] + String("command received"));
      
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
@@ -650,28 +650,28 @@ void loop() {
       }
     }
     if (calibrateVal.equals(calibration_weights[3])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[3] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[3] + String("command received"));
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }
     if (calibrateVal.equals(calibration_weights[4])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[4] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[4] + String("command received"));
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }
     if (calibrateVal.equals(calibration_weights[5])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[5] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[5] + String("command received"));
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }
     if (calibrateVal.equals(calibration_weights[6])) {
-      Serial.println(String("Calibrate ")+ calibration_weights[6] + String("command received"));
+      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[6] + String("command received"));
      
       if(!calibrate_complete_flag){
         calibrate(calibrateVal);
@@ -679,7 +679,7 @@ void loop() {
       }
     }
     if (calibrateVal == "save"){
-      Serial.println("Saving Calibration point values");
+      Serial.println("Calibrate mode: Saving Calibration point values");
 
       sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
       Serial.println(strlen(calibrate_msg));
@@ -688,24 +688,24 @@ void loop() {
       appendFile(SD, file_name_path, calibrate_msg);
       strcpy(calibrate_msg, "");
       //memset(msg, 0, MSG_BUFFER_SIZE);
-      Serial.println("Written to file.");
+      Serial.println("Calibrate mode: Written to file.");
       writeToDisplayCentre(3, WHITE, "Written to file.");
       
       // Set 'ok' for succesfully saving calibration value
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      Serial.println("Wrote ok to characteristic");
+      Serial.println("Calibrate mode: Wrote ok to characteristic");
     }
 
     if (calibrateVal == "done") {
-      Serial.println("Calibrate DONE command received");
+      Serial.println("Calibrate mode: Calibrate DONE command received");
       if(!calibrate_complete_flag){
-        Serial.println("Setting to ok");
+        Serial.println("Calibrate mode: Setting flag to ok");
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }
 
     if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
-      Serial.println("Unacceptable calibrate value received.");
+      Serial.println("Calibrate mode: Unacceptable calibrate value received.");
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
     
@@ -724,10 +724,10 @@ void loop() {
 
     if (newDataReady) {
         float reading = LoadCell.getData();
-        if(reading<reading_threshold & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
+        if(reading<reading_threshold & eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
           boolean _resume = false;
           boolean _tarewait = true;
-          data_num_readings = 0;
+          data_num_readings = 1;
           while (_resume == false) {
             LoadCell.update();
             if(_tarewait){              
@@ -743,7 +743,7 @@ void loop() {
               now = rtc.now();
               // Record tare event on SD card
               sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-              if(MSG_BUFFER_SIZE-strlen(msg)<=28){ //28 is the size of one recorded event string
+              if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
                 // Save to text file on SD card
                 appendFile(SD, file_name_path, msg);
                 strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
@@ -767,7 +767,7 @@ void loop() {
             sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
             // Serial.println(msg);
             // Serial.println(String(strlen(msg)));
-            if(MSG_BUFFER_SIZE-strlen(msg)<=28){
+            if(MSG_BUFFER_SIZE-strlen(msg)<=30){
               // Save to text file on SD card
               appendFile(SD, file_name_path, msg);
               strcpy(msg, "");
@@ -790,7 +790,7 @@ void loop() {
       now = rtc.now();
       // Record tare event
       sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
-      if(MSG_BUFFER_SIZE-strlen(msg)<=28){
+      if(MSG_BUFFER_SIZE-strlen(msg)<=30){
         // Save to text file on SD card
         appendFile(SD, file_name_path, msg);
         strcpy(msg, "");
