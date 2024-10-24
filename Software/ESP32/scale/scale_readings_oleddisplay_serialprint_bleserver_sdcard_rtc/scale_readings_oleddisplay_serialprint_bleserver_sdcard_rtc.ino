@@ -113,6 +113,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate
 RTC_DS3231 rtc; // instantiate an RTClib object
 DateTime now;
 char rtc_time_str[TIME_STRING_SIZE];
+int old_hour; // This is used to check if a new file needs to be created on the SD card
 
 // SD card msg
 char msg[MSG_BUFFER_SIZE];
@@ -129,10 +130,6 @@ BLECharacteristic *readCharacteristic;
 BLECharacteristic *tareCharacteristic;
 BLECharacteristic *calibrateCharacteristic;
 String status = "-1";
-
-
-
-
 
 //------------------------------------------------------
 //------------------HELPER FUNCTIONS------------------------
@@ -161,6 +158,174 @@ class ServerCallbacks: public BLEServerCallbacks {
 
     }
 };
+void updateFilePath(fs::FS &fs, DateTime now){
+  sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
+  
+  sprintf(calibrate_file_name_path, "/calibrate_%s.txt", rtc_time_str); 
+  sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
+  
+  // Print the file names
+  Serial.println(file_name_path);
+  Serial.println(calibrate_file_name_path);
+    
+  // Check if the file already exists so that it is not overwritten
+  File file = fs.open(file_name_path, FILE_APPEND);
+  if(!file){
+    writeFile(fs, file_name_path, "Start\n"); // create the file
+  }
+  file = fs.open(calibrate_file_name_path, FILE_APPEND);
+  if(!file){
+    writeFile(fs, calibrate_file_name_path, "Start\n"); // create the file
+  }
+  old_hour = now.hour();
+};
+void writeFile(fs::FS &fs,  const char * path, const char * message){
+    Serial.printf("Writing file: %s\n", path);
+
+    File file = fs.open(path, FILE_WRITE);
+    if(!file){
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+    if(file.print(message)){
+        Serial.println("File written");
+    } else {
+        Serial.println("Write failed");
+    }
+    file.close();
+};
+void appendFile(fs::FS &fs,  const char * path, const char * message){
+    // Serial.printf("Appending to file: %s\n", path);
+
+    File file = fs.open(path, FILE_APPEND);
+    if(!file){
+        Serial.println("Failed to open file for appending");
+        writeFile(fs, path, message); // create the file
+        return;
+    }
+    file.print(message);
+    // if(file.print(message)){
+    //     Serial.println("Message appended");
+    // } else {
+    //     Serial.println("Append failed");
+    // }
+    file.close();
+};
+void deleteFile(fs::FS &fs,  const char * path){
+    Serial.printf("Deleting file: %s\n", path);
+    if(fs.remove(path)){
+        Serial.println("File deleted");
+    } else {
+        Serial.println("Delete failed");
+    }
+};
+void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* msgToPrint) {
+  display.clearDisplay();
+  display.setTextSize(textSize);
+  display.setTextColor(textColour);
+  display.setCursor(cursorX, cursorY);
+  display.print(msgToPrint);
+  display.display(); 
+};
+void writeToDisplayCentre(int textSize, char textColour, const char* text) {
+  int16_t x1;
+  int16_t y1;
+  uint16_t width;
+  uint16_t height;
+
+  display.getTextBounds(text, 0, 0, &x1, &y1, &width, &height);
+
+  // display on horizontal and vertical center
+  display.clearDisplay(); // clear display
+  display.setTextSize(textSize);
+  display.setTextColor(textColour);
+  display.setCursor((SCREEN_WIDTH - width) / 2, (SCREEN_HEIGHT - height) / 2);
+  display.println(text); // text to display
+  display.display();
+};
+void calibrate(String calibration_weight) {
+  writeToDisplayCentre(2, WHITE, "Calibrating...");
+
+  Serial.println("***");
+  Serial.println("Starting calibration for "+ calibration_weight + "g");
+  
+  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
+  
+  float calibration_value = LoadCell.getData();
+  Serial.println(calibration_value);
+  if(!calibration_weight.equals(calibration_weights[0])){ 
+    sprintf(calibrate_msg, "%s,%s,%.2f", calibrate_msg, calibration_weight, calibration_value); 
+  }
+  else {
+    sprintf(calibrate_msg, "%s,%.2f", calibration_weight, calibration_value); 
+    
+    // Update the reading threshold value based on the lowest calibration value
+    reading_threshold = calibration_value; 
+    #if defined(ESP8266)|| defined(ESP32)
+      EEPROM.begin(512);
+      EEPROM.put(calVal_eepromAdress, reading_threshold);
+      EEPROM.commit();
+      Serial.println("Threshold value is "+ String(EEPROM.get(calVal_eepromAdress, reading_threshold)));
+    #endif
+  }
+
+  calibrate_complete_flag = true;
+  Serial.println(calibrate_msg);
+  Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
+  Serial.println("***");
+};
+
+//  // Not used in the current version of the system but will be necessary for calibration factor update in future.
+// void changeSavedCalFactor() {
+//   float oldCalibrationValue = LoadCell.getCalFactor();
+//   boolean _resume = false;
+//   Serial.println("***");
+//   Serial.print("Current value is: ");
+//   Serial.println(oldCalibrationValue);
+//   Serial.println("Now, send the new value from serial monitor, i.e. 696.0");
+//   float newCalibrationValue;
+//   while (_resume == false) {
+//     if (Serial.available() > 0) {
+//       newCalibrationValue = Serial.parseFloat();
+//       if (newCalibrationValue != 0) {
+//         Serial.print("New calibration value is: ");
+//         Serial.println(newCalibrationValue);
+//         LoadCell.setCalFactor(newCalibrationValue);
+//         _resume = true;
+//       }
+//     }
+//   }
+//   _resume = false;
+//   Serial.print("Save this value to EEPROM adress ");
+//   Serial.print(calVal_eepromAdress);
+//   Serial.println("? y/n");
+//   while (_resume == false) {
+//     if (Serial.available() > 0) {
+//       char inByte = Serial.read();
+//       if (inByte == 'y') {
+// #if defined(ESP8266)|| defined(ESP32)
+//         EEPROM.begin(512);
+// #endif
+//         EEPROM.put(calVal_eepromAdress, newCalibrationValue);
+// #if defined(ESP8266)|| defined(ESP32)
+//         EEPROM.commit();
+// #endif
+//         EEPROM.get(calVal_eepromAdress, newCalibrationValue);
+//         Serial.print("Value ");
+//         Serial.print(newCalibrationValue);
+//         Serial.print(" saved to EEPROM address: ");
+//         Serial.println(calVal_eepromAdress);
+//         _resume = true;
+//       }
+//       else if (inByte == 'n') {
+//         Serial.println("Value not saved to EEPROM");
+//         _resume = true;
+//       }
+//     }
+//   }
+//   Serial.println("End change calibration value");
+//   Serial.println("***");
+// }
 //------------------------------------------------------
 
 void setup() {
@@ -215,10 +380,12 @@ void setup() {
   // Write PC time to RTC
   Serial.println("Setting RTC.");
   rtc.adjust(DateTime(__DATE__, __TIME__));
+  
   now = rtc.now();
   char temp[20];
   sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d",  now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
   Serial.println(temp);
+
   Serial.println("RTC started.");
 
   //--------------------SD CARD SETUP-----------------------
@@ -238,24 +405,26 @@ void setup() {
   Serial.println("SD card mounted.");
 
   // Create the storage file
-  //createDir(SD, file_name_path);
-  sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
-  sprintf(calibrate_file_name_path, "/calibrate_%s.txt", rtc_time_str); 
-  sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
+  updateFilePath(SD, now);
+  // old_hour = now.hour(); // This is used when deciding to make new files on the SD card.
 
-  // Print the file names
-  Serial.println(file_name_path);
-  Serial.println(calibrate_file_name_path);
+  // sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
+  // sprintf(calibrate_file_name_path, "/calibrate_%s.txt", rtc_time_str); 
+  // sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
+
+  // // Print the file names
+  // Serial.println(file_name_path);
+  // Serial.println(calibrate_file_name_path);
   
-  // Check if the file already exists so that it is not overwritten
-  File file = SD.open(file_name_path, FILE_APPEND);
-  if(!file){
-    writeFile(SD, file_name_path, "Start\n"); // create the file
-  }
-  file = SD.open(calibrate_file_name_path, FILE_APPEND);
-  if(!file){
-    writeFile(SD, calibrate_file_name_path, "Start\n"); // create the file
-  }
+  // // Check if the file already exists so that it is not overwritten
+  // File file = SD.open(file_name_path, FILE_APPEND);
+  // if(!file){
+  //   writeFile(SD, file_name_path, "Start\n"); // create the file
+  // }
+  // file = SD.open(calibrate_file_name_path, FILE_APPEND);
+  // if(!file){
+  //   writeFile(SD, calibrate_file_name_path, "Start\n"); // create the file
+  // }
 
 
   //----------BLE SERVER SETUP------------------------
@@ -308,31 +477,15 @@ void setup() {
 
   //while (!LoadCell.update());
   //calibrate(); //start calibration procedure
-}
+};
 
 void loop() {
   // Check the date and time to creat new file paths.
-  char rtc_time_str_new[TIME_STRING_SIZE];
   now = rtc.now();
-  sprintf(rtc_time_str_new, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
-  if(atoi(rtc_time_str_new)!=atoi(rtc_time_str)){
-    sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
-    sprintf(calibrate_file_name_path, "/calibrate_%s.txt", rtc_time_str); 
-    sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
-    // Print the file names
-    Serial.println(file_name_path);
-    Serial.println(calibrate_file_name_path);
-    
-    // Check if the file already exists so that it is not overwritten
-    File file = SD.open(file_name_path, FILE_APPEND);
-    if(!file){
-      writeFile(SD, file_name_path, "Start\n"); // create the file
-    }
-    file = SD.open(calibrate_file_name_path, FILE_APPEND);
-    if(!file){
-      writeFile(SD, calibrate_file_name_path, "Start\n"); // create the file
-    }
+  if(now.hour()!=old_hour){
+    updateFilePath(SD, now);
   }
+
   //----------CONTROLLER MODE------------------------
   // If BLE device is connected, respond according to commands
   if(deviceConnected){ 
@@ -650,159 +803,8 @@ void loop() {
     }
   } // End of case where device is not connected
   
-} // End of main loop
-
-//------------------HELPER FUNCTIONS------------------------
-void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* msgToPrint) {
-  display.clearDisplay();
-  display.setTextSize(textSize);
-  display.setTextColor(textColour);
-  display.setCursor(cursorX, cursorY);
-  display.print(msgToPrint);
-  display.display(); 
-}
-
-void writeToDisplayCentre(int textSize, char textColour, const char* text) {
-  int16_t x1;
-  int16_t y1;
-  uint16_t width;
-  uint16_t height;
-
-  display.getTextBounds(text, 0, 0, &x1, &y1, &width, &height);
-
-  // display on horizontal and vertical center
-  display.clearDisplay(); // clear display
-  display.setTextSize(textSize);
-  display.setTextColor(textColour);
-  display.setCursor((SCREEN_WIDTH - width) / 2, (SCREEN_HEIGHT - height) / 2);
-  display.println(text); // text to display
-  display.display();
-}
+}; // End of main loop
 
 
-void calibrate(String calibration_weight) {
-  writeToDisplayCentre(2, WHITE, "Calibrating...");
 
-  Serial.println("***");
-  Serial.println("Starting calibration for "+ calibration_weight + "g");
-  
-  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
-  
-  float calibration_value = LoadCell.getData();
-  Serial.println(calibration_value);
-  if(!calibration_weight.equals(calibration_weights[0])){ 
-    sprintf(calibrate_msg, "%s,%s,%.2f", calibrate_msg, calibration_weight, calibration_value); 
-  }
-  else {
-    sprintf(calibrate_msg, "%s,%.2f", calibration_weight, calibration_value); 
-    
-    // Update the reading threshold value based on the lowest calibration value
-    reading_threshold = calibration_value; 
-    #if defined(ESP8266)|| defined(ESP32)
-      EEPROM.begin(512);
-      EEPROM.put(calVal_eepromAdress, reading_threshold);
-      EEPROM.commit();
-      Serial.println("Threshold value is "+ String(EEPROM.get(calVal_eepromAdress, reading_threshold)));
-    #endif
-  }
 
-  calibrate_complete_flag = true;
-  Serial.println(calibrate_msg);
-  Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
-  Serial.println("***");
-}
-
-//  // Not used in the current version of the system but will be necessary for calibration factor update in future.
-// void changeSavedCalFactor() {
-//   float oldCalibrationValue = LoadCell.getCalFactor();
-//   boolean _resume = false;
-//   Serial.println("***");
-//   Serial.print("Current value is: ");
-//   Serial.println(oldCalibrationValue);
-//   Serial.println("Now, send the new value from serial monitor, i.e. 696.0");
-//   float newCalibrationValue;
-//   while (_resume == false) {
-//     if (Serial.available() > 0) {
-//       newCalibrationValue = Serial.parseFloat();
-//       if (newCalibrationValue != 0) {
-//         Serial.print("New calibration value is: ");
-//         Serial.println(newCalibrationValue);
-//         LoadCell.setCalFactor(newCalibrationValue);
-//         _resume = true;
-//       }
-//     }
-//   }
-//   _resume = false;
-//   Serial.print("Save this value to EEPROM adress ");
-//   Serial.print(calVal_eepromAdress);
-//   Serial.println("? y/n");
-//   while (_resume == false) {
-//     if (Serial.available() > 0) {
-//       char inByte = Serial.read();
-//       if (inByte == 'y') {
-// #if defined(ESP8266)|| defined(ESP32)
-//         EEPROM.begin(512);
-// #endif
-//         EEPROM.put(calVal_eepromAdress, newCalibrationValue);
-// #if defined(ESP8266)|| defined(ESP32)
-//         EEPROM.commit();
-// #endif
-//         EEPROM.get(calVal_eepromAdress, newCalibrationValue);
-//         Serial.print("Value ");
-//         Serial.print(newCalibrationValue);
-//         Serial.print(" saved to EEPROM address: ");
-//         Serial.println(calVal_eepromAdress);
-//         _resume = true;
-//       }
-//       else if (inByte == 'n') {
-//         Serial.println("Value not saved to EEPROM");
-//         _resume = true;
-//       }
-//     }
-//   }
-//   Serial.println("End change calibration value");
-//   Serial.println("***");
-// }
-
-void writeFile(fs::FS &fs,  const char * path, const char * message){
-    Serial.printf("Writing file: %s\n", path);
-
-    File file = fs.open(path, FILE_WRITE);
-    if(!file){
-        Serial.println("Failed to open file for writing");
-        return;
-    }
-    if(file.print(message)){
-        Serial.println("File written");
-    } else {
-        Serial.println("Write failed");
-    }
-    file.close();
-}
-
-void appendFile(fs::FS &fs,  const char * path, const char * message){
-    // Serial.printf("Appending to file: %s\n", path);
-
-    File file = fs.open(path, FILE_APPEND);
-    if(!file){
-        Serial.println("Failed to open file for appending");
-        writeFile(fs, path, message); // create the file
-        return;
-    }
-    file.print(message);
-    // if(file.print(message)){
-    //     Serial.println("Message appended");
-    // } else {
-    //     Serial.println("Append failed");
-    // }
-    file.close();
-}
-
-void deleteFile(fs::FS &fs,  const char * path){
-    Serial.printf("Deleting file: %s\n", path);
-    if(fs.remove(path)){
-        Serial.println("File deleted");
-    } else {
-        Serial.println("Delete failed");
-    }
-}
