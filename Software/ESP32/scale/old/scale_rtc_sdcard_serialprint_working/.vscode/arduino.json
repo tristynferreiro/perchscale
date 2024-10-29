@@ -1,7 +1,0 @@
-{
-    "port": "/dev/tty.usbserial-0001",
-    "configuration": "JTAGAdapter=default,PSRAM=disabled,PartitionScheme=default,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,LoopCore=1,EventsCore=1,DebugLevel=none,EraseFlash=none",
-    "board": "esp32:esp32:esp32",
-    "programmer": "esptool",
-    "sketch": "scale_rtc_sdcard_serialprint_working.ino"
-}
