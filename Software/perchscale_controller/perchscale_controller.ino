@@ -25,7 +25,7 @@
 
 #include <Wire.h>
 // String
-#include <string>
+#include <String>
 
 // BLE
 #include "BLEDevice.h"
@@ -47,8 +47,8 @@
 #define BUTTON_SELECT_PIN 27 // pin for SELECT button
 #define BUTTON_DOWN_PIN 26 // pin for DOWN button
 #define BUTTON_BACK_PIN 4 // pin for BACK button
-#define CLICKED_STATE 1
-#define UNCLICKED_STATE 0 
+#define CLICKED_STATE 0
+#define UNCLICKED_STATE 1 
 
 //----------------------------------------------------
 
@@ -234,7 +234,7 @@ bool connectToServer() {
 
     // Read the value of the characteristic.
     if(pRemoteCharacteristic->canRead()) {
-      std::string value = pRemoteCharacteristic->readValue();
+      String value = pRemoteCharacteristic->readValue();
       Serial.print("BLE: The characteristic value is: ");
       Serial.println(value.c_str());
     }
@@ -265,7 +265,7 @@ bool connectToServer() {
 
     // Read the value of the characteristic.
     if(readRemoteCharacteristic->canRead()) {
-      std::string value = readRemoteCharacteristic->readValue();
+      String value = readRemoteCharacteristic->readValue();
       Serial.print("BLE: The READ characteristic value = ");
       Serial.println(value.c_str());
     }
@@ -284,7 +284,7 @@ bool connectToServer() {
 
     // Read the value of the characteristic.
     if(tareRemoteCharacteristic->canRead()) {
-      std::string value = tareRemoteCharacteristic->readValue();
+      String value = tareRemoteCharacteristic->readValue();
       Serial.print("BLE: The TARE characteristic value = ");
       Serial.println(value.c_str());
     }
@@ -304,7 +304,7 @@ bool connectToServer() {
 
     // Read the value of the characteristic.
     if(calibrateRemoteCharacteristic->canRead()) {
-      std::string value = calibrateRemoteCharacteristic->readValue();
+      String value = calibrateRemoteCharacteristic->readValue();
       Serial.print("BLE: The CALIBRATE characteristic value = ");
       Serial.println(value.c_str());
     }
@@ -356,10 +356,10 @@ void setup() {
   Serial.println("OLED startup completed.");
 
   //--------------------DPAD SETUP-----------------------
-  pinMode(BUTTON_UP_PIN, INPUT); // up button
-  pinMode(BUTTON_SELECT_PIN, INPUT); // select button
-  pinMode(BUTTON_DOWN_PIN, INPUT); // down button
-  pinMode(BUTTON_BACK_PIN, INPUT); // down button
+  pinMode(BUTTON_UP_PIN, INPUT_PULLUP); // up button
+  pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP); // select button
+  pinMode(BUTTON_DOWN_PIN, INPUT_PULLUP); // down button
+  pinMode(BUTTON_BACK_PIN, INPUT_PULLUP); // down button
   Serial.println("DPAD setup completed.");
 
    //--------------------BLE CLIENT-----------------------
@@ -542,7 +542,7 @@ void loop() {
       u8g2.setCursor(0, 15);
       //------------------------- BLE RECEIVE SCALE READINGS -------------------------------- 
       if (connected) { // Read values from server
-        std::string value = readRemoteCharacteristic->readValue();
+        String value = readRemoteCharacteristic->readValue();
         Serial.print("Read value from server: ");
         Serial.println(value.c_str());
         u8g2.drawStrX2(0, 32, value.c_str());
@@ -560,7 +560,7 @@ void loop() {
       if (connected) { // Read values from server
         u8g2.print("Going back..."); 
         Serial.println("Read: Going back to main menu");
-        std::string value = readRemoteCharacteristic->readValue();
+        String value = readRemoteCharacteristic->readValue();
         if(value != "rst"){
           Serial.println("Read: Sending reset command for read characteristic");
           readRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -630,7 +630,7 @@ void loop() {
       if(display_counter == DELAY_COUNTER){ // Delay
         
         if (connected) { // Read values from server
-          std::string value = tareRemoteCharacteristic->readValue();
+          String value = tareRemoteCharacteristic->readValue();
           // Serial.println(value.c_str());
           if(value == "ok"){
             process_screen = 2;
@@ -744,7 +744,7 @@ void loop() {
       // If we are connected to a peer BLE Server, update the TARE characteristic
       if(display_counter == DELAY_COUNTER){ // Delay
         if (connected) { // Read values from server
-          std::string value = tareRemoteCharacteristic->readValue();
+          String value = tareRemoteCharacteristic->readValue();
           // Serial.println(value.c_str());
           if(value == "ok"){
             process_screen = 2;
@@ -851,7 +851,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -931,7 +931,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -983,7 +983,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -1035,7 +1035,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -1087,7 +1087,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -1139,7 +1139,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -1191,7 +1191,7 @@ void loop() {
       //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
         if (connected) { // Read values from server
-          std::string value = calibrateRemoteCharacteristic->readValue(); 
+          String value = calibrateRemoteCharacteristic->readValue(); 
           // Serial.println(value.c_str());
           if(value == "ok"){
             calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -1215,7 +1215,7 @@ void loop() {
       u8g2.print("value now...");          
       //------------------------- SAVE CAL VAL -------------------------------
       if (connected){
-        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        String value = calibrateRemoteCharacteristic->readValue(); 
         // Serial.println(value.c_str());
         calibrateRemoteCharacteristic->writeValue(saveMsg.c_str(),saveMsg.length()); // tell the server to begin saving value
         Serial.println("Calibrate: calibrate characteristic set to save.");
@@ -1236,7 +1236,7 @@ void loop() {
       u8g2.print("value now...");          
       //------------------------- SAVE CAL VAL -------------------------------
       if (connected){
-        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        String value = calibrateRemoteCharacteristic->readValue(); 
         // Serial.println(value.c_str());
         if(value == "ok"){
           Serial.println("Calibrate: Sucessfully saved EEPROM value");
@@ -1264,7 +1264,7 @@ void loop() {
       //------------------------- CONFIRMATION OF SAVE CAL VAL -------------------------------   
       // If we are connected to a peer BLE Server, update the TARE characteristic
       if (connected) { // Read values from server
-        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        String value = calibrateRemoteCharacteristic->readValue(); 
         // Serial.println(value.c_str());
         
         calibrateRemoteCharacteristic->writeValue(doneMsg.c_str(),doneMsg.length()); // tell the server to begin saving value
@@ -1286,7 +1286,7 @@ void loop() {
       u8g2.print("Complete");          
       //------------------------- SAVE CAL VAL ------------------------------- 
       if (connected) { // Read values from server
-        std::string value = calibrateRemoteCharacteristic->readValue(); 
+        String value = calibrateRemoteCharacteristic->readValue(); 
         // Serial.println(value.c_str());
         if(value == "ok"){
           calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
