@@ -1,7 +1,8 @@
 /*
-* WRITE DESCRIPTIONS
-*
-* Working: 15/06/2024
+* This contains the PerchScale controller code. 
+* 
+* Working: 
+*   v1: 29/10/2024, Components: OLED screen Menu {Connect, Disconnect, Calibrate, Tare, Read}, DPAD and BLE client. 
 *
 * Pin connections:
 *   OLED:
@@ -46,6 +47,8 @@
 #define BUTTON_SELECT_PIN 27 // pin for SELECT button
 #define BUTTON_DOWN_PIN 26 // pin for DOWN button
 #define BUTTON_BACK_PIN 4 // pin for BACK button
+#define CLICKED_STATE 1
+#define UNCLICKED_STATE 0 
 
 //----------------------------------------------------
 
@@ -371,7 +374,7 @@ void loop() {
   if (current_screen == 0) { // MENU SCREEN
       // up and down buttons only work for the menu screen
       //--------------------UP BUTTON-----------------------
-      if ((digitalRead(BUTTON_UP_PIN) == LOW) && (button_up_clicked == 0)) { // up button clicked - jump to previous menu item
+      if ((digitalRead(BUTTON_UP_PIN) == CLICKED_STATE) && (button_up_clicked == 0)) { // up button clicked - jump to previous menu item
         item_selected = item_selected - 1; // select previous item
         // Serial.print("Item Selected:"); // DEBUGGING CODE
         // Serial.println(String(menu_items[item_selected]));        
@@ -381,7 +384,7 @@ void loop() {
         }
       }
       //--------------------DOWN BUTTON-----------------------
-      else if ((digitalRead(BUTTON_DOWN_PIN) == LOW) && (button_down_clicked == 0)) { // down button clicked - jump to next menu item       
+      else if ((digitalRead(BUTTON_DOWN_PIN) == CLICKED_STATE) && (button_down_clicked == 0)) { // down button clicked - jump to next menu item       
         item_selected = item_selected + 1; // select next item
         // Serial.print("Item Selected:"); // DEBUGGING CODE
         // Serial.println(String(menu_items[item_selected]));       
@@ -391,17 +394,17 @@ void loop() {
           }
       } 
 
-      if ((digitalRead(BUTTON_UP_PIN) == HIGH) && (button_up_clicked == 1)) { // unclick 
+      if ((digitalRead(BUTTON_UP_PIN) == UNCLICKED_STATE) && (button_up_clicked == 1)) { // unclick 
         button_up_clicked = 0;
       }
-      if ((digitalRead(BUTTON_DOWN_PIN) == HIGH) && (button_down_clicked == 1)) { // unclick
+      if ((digitalRead(BUTTON_DOWN_PIN) == UNCLICKED_STATE) && (button_down_clicked == 1)) { // unclick
         button_down_clicked = 0;
       }
 
   }
 
   //--------------------SELECT BUTTON-----------------------
-  if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
+  if ((digitalRead(BUTTON_SELECT_PIN) == CLICKED_STATE) && (button_select_clicked == 0)) { // select button clicked, jump between screens
     button_select_clicked = 1; // set button to clicked to only perform the action once
     
     if ((current_screen == 0)) {current_screen = 1;} // main menu --> scale screen
@@ -458,12 +461,12 @@ void loop() {
     //else if (current_screen == 4 && process_screen ==1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 5;}
     //  else {current_screen = 0;} // qr codes screen --> menu items screen
   }
-  if ((digitalRead(BUTTON_SELECT_PIN) == HIGH) && (button_select_clicked == 1)) { // unclick 
+  if ((digitalRead(BUTTON_SELECT_PIN) == UNCLICKED_STATE) && (button_select_clicked == 1)) { // unclick 
     button_select_clicked = 0;
   }
 
   //--------------------BACK BUTTON-----------------------
-  if ((digitalRead(BUTTON_BACK_PIN) == LOW) && (button_back_clicked == 0)) { // back button clicked, return to main menu
+  if ((digitalRead(BUTTON_BACK_PIN) == CLICKED_STATE) && (button_back_clicked == 0)) { // back button clicked, return to main menu
      button_back_clicked = 1; // set button to clicked to only perform the action once
     if (current_screen == 1 && process_screen == 1 && String(menu_items[item_selected])=="Read"){
       process_screen = 2;
@@ -475,7 +478,7 @@ void loop() {
      else if (current_screen == 5) {current_screen = 0;}
      else {current_screen = 0;}
   }
-  if ((digitalRead(BUTTON_BACK_PIN) == HIGH) && (button_back_clicked == 1)) { // unclick 
+  if ((digitalRead(BUTTON_BACK_PIN) == UNCLICKED_STATE) && (button_back_clicked == 1)) { // unclick 
     button_back_clicked = 0;
   }  
 
