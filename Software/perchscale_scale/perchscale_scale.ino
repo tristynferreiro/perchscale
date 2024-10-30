@@ -277,8 +277,8 @@ void calibrate(String calibration_weight) {
   Serial.println("***");
   Serial.println("Starting calibration for "+ calibration_weight + "g");
   
-  LoadCell.update();
-  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
+  // LoadCell.update();
+  // LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
   LoadCell.update();
   float calibration_value = LoadCell.getData();
   Serial.println(calibration_value);
@@ -303,58 +303,6 @@ void calibrate(String calibration_weight) {
   Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
   Serial.println("***");
 };
-
-//  // Not used in the current version of the system but will be necessary for calibration factor update in future.
-// void changeSavedCalFactor() {
-//   float oldCalibrationValue = LoadCell.getCalFactor();
-//   boolean _resume = false;
-//   Serial.println("***");
-//   Serial.print("Current value is: ");
-//   Serial.println(oldCalibrationValue);
-//   Serial.println("Now, send the new value from serial monitor, i.e. 696.0");
-//   float newCalibrationValue;
-//   while (_resume == false) {
-//     if (Serial.available() > 0) {
-//       newCalibrationValue = Serial.parseFloat();
-//       if (newCalibrationValue != 0) {
-//         Serial.print("New calibration value is: ");
-//         Serial.println(newCalibrationValue);
-//         LoadCell.setCalFactor(newCalibrationValue);
-//         _resume = true;
-//       }
-//     }
-//   }
-//   _resume = false;
-//   Serial.print("Save this value to EEPROM adress ");
-//   Serial.print(calVal_eepromAdress);
-//   Serial.println("? y/n");
-//   while (_resume == false) {
-//     if (Serial.available() > 0) {
-//       char inByte = Serial.read();
-//       if (inByte == 'y') {
-// #if defined(ESP32)
-//         EEPROM.begin(512);
-// #endif
-//         EEPROM.put(calVal_eepromAdress, newCalibrationValue);
-// #if defined(ESP32)
-//         EEPROM.commit();
-// #endif
-//         EEPROM.get(calVal_eepromAdress, newCalibrationValue);
-//         Serial.print("Value ");
-//         Serial.print(newCalibrationValue);
-//         Serial.print(" saved to EEPROM address: ");
-//         Serial.println(calVal_eepromAdress);
-//         _resume = true;
-//       }
-//       else if (inByte == 'n') {
-//         Serial.println("Value not saved to EEPROM");
-//         _resume = true;
-//       }
-//     }
-//   }
-//   Serial.println("End change calibration value");
-//   Serial.println("***");
-// }
 
 void logMessage(fs::FS &fs, const char * message, Loglevel level){
   // Check if the message level meets the minimum log level
@@ -513,66 +461,16 @@ void controllerTare(){
 void controllerCalibrate(){
   String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
+    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
+      Serial.println("Calibrate mode: Unacceptable calibrate value received.");
+      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
+    }
+
     if (calibrateVal == rstMSG) {
       Serial.println("Calibrate mode: Resetting calibrate flag.");
       calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
       calibrate_complete_flag = false;
-    }
-
-    if (calibrateVal.equals(calibration_weights[0])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[0] + String("command received"));
-     
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[1])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[1] + String("command received"));
-     
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[2])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[2] + String("command received"));
-     
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[3])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[3] + String("command received"));
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[4])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[4] + String("command received"));
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[5])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[5] + String("command received"));
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal.equals(calibration_weights[6])) {
-      Serial.println(String("Calibrate mode: Calibrate ")+ calibration_weights[6] + String("command received"));
-     
-      if(!calibrate_complete_flag){
-        calibrate(calibrateVal);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }
-    if (calibrateVal == "save"){
+    }else if(calibrateVal == "save"){
       Serial.println("Calibrate mode: Saving Calibration point values");
 
       sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
@@ -592,21 +490,26 @@ void controllerCalibrate(){
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       Serial.println("Calibrate mode: Wrote ok to characteristic");
     }
-
-    if (calibrateVal == "done") {
+    else if(calibrateVal == "done") {
       Serial.println("Calibrate mode: Calibrate DONE command received");
       if(!calibrate_complete_flag){
         Serial.println("Calibrate mode: Setting flag to ok");
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
+    }else{
+      // Run calibration
+      for (int i = 0; i < NUM_POINTS; i++){
+        if (calibrateVal.equals(calibration_weights[i])) {
+          Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
+        
+          if(!calibrate_complete_flag){
+            calibrate(calibrateVal);
+            calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+          }
+        }
+      }
     }
-
-    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
-      Serial.println("Calibrate mode: Unacceptable calibrate value received.");
-      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
-    }
-    
-    delay(200);
+    delay(100);
 }
 
 void logData(fs::FS &fs, String mode, String type, float reading){ 
