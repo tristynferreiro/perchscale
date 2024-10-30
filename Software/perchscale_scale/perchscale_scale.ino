@@ -29,39 +29,8 @@
 *   Vcc of RTC -> 5V of ESP32
 */
 
-//------------------INCLUDES------------------------
-#include <HX711_ADC.h>
-#if defined(ESP8266)|| defined(ESP32) || defined(AVR)
-#include <EEPROM.h>
-// OLED
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-// String
-#include <string>
-// BLE Server
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#endif
-
-// RTC
-#include "Wire.h"
-#include "RTClib.h"
-
-// SD Card
-#include "SD.h"
-#include "SPI.h"
-#include "FS.h"
-
-//--------------------DEFINES-------------------------
-#define eigthseconds (millis()/125) // Taring delay
-#define MSG_BUFFER_SIZE 4000 
-#define TIME_STRING_SIZE 11
-
-// OLED
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+//-----------------CODE SETUP---------------------
+#define OLED_CONNECTED // comment if the OLED will not be attached to the device
 
 // BLE Server
 // See the following for generating UUIDs:
@@ -74,8 +43,46 @@
 #define CHARACTERISTIC_UUID_TARE  "00000004-7e47-40e7-8ac0-9512595ab3fa"
 #define CHARACTERISTIC_UUID_CALIBRATE  "00000005-7e47-40e7-8ac0-9512595ab3fa"
 
+//------------------INCLUDES------------------------
+#if defined(ESP32)
+  #include <HX711_ADC.h>
+
+  #include <EEPROM.h>
+  // OLED
+  #ifdef OLED_CONNECTED
+    #include <Wire.h>
+    #include <Adafruit_GFX.h>
+    #include <Adafruit_SSD1306.h>
+  #endif
+  // String
+  #include <String>
+  // BLE Server
+  #include <BLEDevice.h>
+  #include <BLEUtils.h>
+  #include <BLEServer.h>
+
+  // RTC
+  #include "Wire.h"
+  #include "RTClib.h"
+
+  // SD Card
+  #include "SD.h"
+  #include "SPI.h"
+  #include "FS.h"
+#endif
+
+//--------------------DEFINES-------------------------
+#define eigthseconds (millis()/125) // Taring delay
+#define MSG_BUFFER_SIZE 4000 
+#define TIME_STRING_SIZE 11
+
+// OLED
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
 // Loadcell
 #define CALIBRATION_FACTOR 1.0
+
 //--------------------GLOBAL VARIABLES-----------------
 // DATA FILES
 char file_name_path[31] = "/weight_readings_test.txt";
@@ -106,9 +113,10 @@ float reading_threshold;
 // EEPROM address
 const int calVal_eepromAdress = 0;
 
-
 // OLED
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate an SSD1306 display connected to I2C
+#ifdef OLED_CONNECTED
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate an SSD1306 display connected to I2C
+#endif
 
 // RTC time
 RTC_DS3231 rtc; // instantiate an RTClib object
@@ -131,6 +139,17 @@ BLECharacteristic *readCharacteristic;
 BLECharacteristic *tareCharacteristic;
 BLECharacteristic *calibrateCharacteristic;
 String status = "-1";
+
+#define log_file_path "/log.txt"
+#define LOG_BUFFER_SIZE 500
+char log_buffer[LOG_BUFFER_SIZE];
+enum Loglevel {
+  INFO_LEVEL,
+  WARNING_LEVEL,
+  ERROR_LEVEL
+};
+
+#define MIN_LOG_LEVEL INFO_LEVEL
 
 //------------------------------------------------------
 //------------------HELPER FUNCTIONS------------------------
@@ -220,6 +239,8 @@ void deleteFile(fs::FS &fs,  const char * path){
         Serial.println("Delete failed");
     }
 };
+
+#ifdef OLED_CONNECTED
 void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* msgToPrint) {
   display.clearDisplay();
   display.setTextSize(textSize);
@@ -228,6 +249,7 @@ void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, con
   display.print(msgToPrint);
   display.display(); 
 };
+
 void writeToDisplayCentre(int textSize, char textColour, const char* text) {
   int16_t x1;
   int16_t y1;
@@ -244,8 +266,12 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
   display.println(text); // text to display
   display.display();
 };
+#endif
+
 void calibrate(String calibration_weight) {
-  writeToDisplayCentre(2, WHITE, "Calibrating...");
+  #ifdef OLED_CONNECTED
+    writeToDisplayCentre(2, WHITE, "Calibrating...");
+  #endif
 
   Serial.println("***");
   Serial.println("Starting calibration for "+ calibration_weight + "g");
@@ -262,7 +288,7 @@ void calibrate(String calibration_weight) {
     
     // Update the reading threshold value based on the lowest calibration value
     reading_threshold = calibration_value; 
-    #if defined(ESP8266)|| defined(ESP32)
+    #if defined(ESP32)
       EEPROM.begin(512);
       EEPROM.put(calVal_eepromAdress, reading_threshold);
       EEPROM.commit();
@@ -304,11 +330,11 @@ void calibrate(String calibration_weight) {
 //     if (Serial.available() > 0) {
 //       char inByte = Serial.read();
 //       if (inByte == 'y') {
-// #if defined(ESP8266)|| defined(ESP32)
+// #if defined(ESP32)
 //         EEPROM.begin(512);
 // #endif
 //         EEPROM.put(calVal_eepromAdress, newCalibrationValue);
-// #if defined(ESP8266)|| defined(ESP32)
+// #if defined(ESP32)
 //         EEPROM.commit();
 // #endif
 //         EEPROM.get(calVal_eepromAdress, newCalibrationValue);
@@ -328,48 +354,52 @@ void calibrate(String calibration_weight) {
 //   Serial.println("***");
 // }
 
+void logMessage(fs::FS &fs, const char * message, Loglevel level){
+  // Check if the message level meets the minimum log level
+  if (level < MIN_LOG_LEVEL) return;
+
+  now = rtc.now();
+  char log_msg [100];
+  sprintf(log_msg, "%02d:%02d:%02d,%02d/%02d/%02d [%s] %s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), getLogLevelString(level), message);
+  
+  if(sizeof(log_buffer)+sizeof(log_msg)<LOG_BUFFER_SIZE){
+    strcat(log_buffer,log_msg);
+  }else{
+    appendFile(SD,  log_file_path, log_buffer);
+    memset(log_buffer, 0, LOG_BUFFER_SIZE); // Set all bytes in buffer to 0
+    strcat(log_buffer,log_msg);
+  }
+};
+
+// Helper function to convert log level to a string
+const char* getLogLevelString(Loglevel level) {
+  switch (level) {
+    case INFO_LEVEL: return "INFO";
+    case WARNING_LEVEL: return "WARNING";
+    case ERROR_LEVEL: return "ERROR";
+    default: return "?";
+  };
+};
+
 //*******************************************************************************************************************************
-//*******************************************************************************************************************************
+//
+
 void setup() {
+  //----------SERIAL SETUP------------------------
+  Serial.begin(9600); // Initialise baud rate with PC
   Serial.println("\n*************************");
   Serial.println("Beginning startup routine.");
 
-  //----------SERIAL SETUP------------------------
-  Serial.begin(9600); // Initialise baud rate with PC
-  
-  //----------LOADCELL SETUP------------------------
-  LoadCell.begin();
-  // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
-  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
-  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
-  LoadCell.start(stabilizingtime, _tare);
-
-  if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
-    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
-    while (1);
-  }  // else {
-  //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
-  //   Serial.println("Startup is complete");
-  // }
-  LoadCell.setCalFactor(CALIBRATION_FACTOR);
-
-  // Set the threshold value for taking readings based on the last value saved in EEPROM
-  EEPROM.begin(512);
-  EEPROM.get(calVal_eepromAdress, reading_threshold);
-  if(isnan(reading_threshold)){
-    reading_threshold = 1; // ADJUST ACCORDING TO WHAT MAKES SENSE
-  }
-  Serial.println("\nReading threshold value is " + String(reading_threshold));
-  Serial.println("Loadcell startup is complete");
-
   //----------OLED SETUP------------------------
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
-  }
-  delay(2000);
-  display.clearDisplay();
-  Serial.println("OLED startup completed.");
+  #ifdef OLED_CONNECTED
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+      Serial.println("Error: OLED not detected/connected.");
+      for(;;);
+    }
+    delay(2000);
+    display.clearDisplay();
+    Serial.println("OLED startup completed.");
+  #endif
 
   //--------------------RTC SETUP-----------------------
   Wire.begin(); // required by the RTClib library because I2C is used
@@ -409,25 +439,47 @@ void setup() {
 
   // Create the storage file
   updateFilePath(SD, now);
-  // old_hour = now.hour(); // This is used when deciding to make new files on the SD card.
+  File file = SD.open(log_file_path, FILE_APPEND);
+  if(!file){
+    writeFile(SD, log_file_path, "Start\n"); // create the file
+  }
 
-  // sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
-  // sprintf(calibrate_file_name_path, "/calibrate_%s.txt", rtc_time_str); 
-  // sprintf(file_name_path, "/weights_%s.txt", rtc_time_str); 
+  // logMessage(SD, "SD card setup.", INFO_LEVEL);
 
-  // // Print the file names
-  // Serial.println(file_name_path);
-  // Serial.println(calibrate_file_name_path);
+//----------LOADCELL SETUP------------------------
+  LoadCell.begin();
+  // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
+  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
+  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
+  LoadCell.start(stabilizingtime, _tare);
+
+  if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
+    // logMessage(SD, "Timeout, check MCU>HX711 wiring and pin designations", ERROR_LEVEL);
+    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
+    while (1);
+  }  // else {
+  //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
+  //   Serial.println("Startup is complete");
+  // }
+  LoadCell.setCalFactor(CALIBRATION_FACTOR);
+
+  // Set the threshold value for taking readings based on the last value saved in EEPROM
+  EEPROM.begin(512);
+  EEPROM.get(calVal_eepromAdress, reading_threshold);
+  if(isnan(reading_threshold)){
+    reading_threshold = 1; // ADJUST ACCORDING TO WHAT MAKES SENSE
+  }
+  Serial.println("\nReading threshold value is " + String(reading_threshold));
+  Serial.println("Loadcell startup is complete");
+
   
-  // // Check if the file already exists so that it is not overwritten
-  // File file = SD.open(file_name_path, FILE_APPEND);
-  // if(!file){
-  //   writeFile(SD, file_name_path, "Start\n"); // create the file
-  // }
-  // file = SD.open(calibrate_file_name_path, FILE_APPEND);
-  // if(!file){
-  //   writeFile(SD, calibrate_file_name_path, "Start\n"); // create the file
-  // }
+  // logMessage(SD, strcat("Threshold value set to",String(reading_threshold).c_str()),INFO_LEVEL);
+
+  // Serial.println(log_buffer);
+ 
+  // logMessage(SD, "Loadcell startup is complete",INFO_LEVEL);
+
+  // Serial.println(log_buffer);
 
 
   //----------BLE SERVER SETUP------------------------
@@ -472,12 +524,16 @@ void setup() {
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
   Serial.println("BLE startup is complete. Characteristics are defined and advertised.");
+  // logMessage(SD, "BLE startup is complete. Characteristics are defined and advertised.",INFO_LEVEL);
   // ----------------------------------------------- 
 
   // Output that startup is complete on display
-  writeToDisplayCentre(2.5, WHITE, "Startup complete");
-
+  #ifdef OLED_CONNECTED
+    writeToDisplayCentre(2.5, WHITE, "Startup complete");
+  #endif
+  // logMessage(SD, "Startup complete",INFO_LEVEL);
   Serial.println("*************************");
+  // Serial.println(log_buffer);
 };
 
 void loop() {
@@ -491,11 +547,20 @@ void loop() {
   // If BLE device is connected, respond according to commands
   if(deviceConnected){ 
     if(status == "connected"){
+       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Controller connected");
+      #endif
+      Serial.println("BLE: Controller connected");
     }else if (status == "tare"){
+       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Taring");
+      #endif
+      Serial.println("Controller mode = tarring");
     }else if (status == "calibrate"){
+       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Calibrating");
+      #endif
+      Serial.println("Controller mode = calibrate");
     }else if(status == "read"){
     }
 
@@ -530,8 +595,9 @@ void loop() {
               }
               if (LoadCell.getTareStatus() == true) {
                 readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
+                 #ifdef OLED_CONNECTED
                 writeToDisplayCentre(2.5, WHITE, "Tare done");
-                // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
+                #endif
 
                 Serial.println("Read mode: Next Tare Complete");
                 
@@ -564,9 +630,9 @@ void loop() {
                 Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
               }
               String reading_msg = String(reading) + "g";
-             
+               #ifdef OLED_CONNECTED
               writeToDisplayCentre(3, WHITE, reading_msg.c_str());
-              // writeToDisplay(3, WHITE, 0, 4, reading_msg.c_str());
+              #endif
 
               readCharacteristic->setValue(String(reading_msg).c_str()); // BLE: Updating value to scale reading
 
@@ -589,8 +655,10 @@ void loop() {
       status = "tare"; // OLED set the status
       Serial.println("Tare mode: Tare command received");
       LoadCell.tareNoDelay(); //tare
-
+      
+      #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Tare done");
+      #endif
       
       // Get current time from RTC
       now = rtc.now();
@@ -603,7 +671,10 @@ void loop() {
         strcpy(msg, "");
         //memset(msg, 0, MSG_BUFFER_SIZE);
         Serial.println("Tare mode: Written to file.");
+
+        #ifdef OLED_CONNECTED
         writeToDisplayCentre(3, WHITE, "Written to file.");
+        #endif
       }
 
       tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
@@ -688,7 +759,10 @@ void loop() {
       strcpy(calibrate_msg, "");
       //memset(msg, 0, MSG_BUFFER_SIZE);
       Serial.println("Calibrate mode: Written to file.");
+
+      #ifdef OLED_CONNECTED
       writeToDisplayCentre(3, WHITE, "Written to file.");
+      #endif
       
       // Set 'ok' for succesfully saving calibration value
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
@@ -734,10 +808,10 @@ void loop() {
               _tarewait = false;
             }
             if (LoadCell.getTareStatus() == true) {
-              
+              #ifdef OLED_CONNECTED
               writeToDisplayCentre(2.5, WHITE, "Tare done");
-              // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
-
+              #endif
+              
               // Get current time from RTC
               now = rtc.now();
               // Record tare event on SD card
@@ -747,7 +821,10 @@ void loop() {
                 appendFile(SD, file_name_path, msg);
                 strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
                 Serial.println("Written to file.");
+
+                #ifdef OLED_CONNECTED
                 writeToDisplayCentre(3, WHITE, "Written to file.");
+                #endif
               }
 
               Serial.println("Next Tare Complete");
@@ -758,7 +835,9 @@ void loop() {
         }
         else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
             String reading_msg = String(reading) + "g";
+            #ifdef OLED_CONNECTED
             writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+            #endif
             
             // Get current time from RTC
             now = rtc.now();
@@ -772,7 +851,10 @@ void loop() {
               strcpy(msg, "");
               //memset(msg, 0, MSG_BUFFER_SIZE);
               Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
+
+              #ifdef OLED_CONNECTED
               writeToDisplayCentre(3, WHITE, "Written to file.");
+              #endif
             }  
             newDataReady = 0;
             data_num_readings++;
@@ -782,8 +864,10 @@ void loop() {
 
     // check if last tare operation is complete
     if (LoadCell.getTareStatus() == true) {
+
+      #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Tare done");
-      // writeToDisplay(2.5, WHITE, 0, 10, "Tare done");
+      #endif
 
       // Get current time from RTC
       now = rtc.now();
@@ -795,7 +879,10 @@ void loop() {
         strcpy(msg, "");
         //memset(msg, 0, MSG_BUFFER_SIZE);
         Serial.println("Written to file.");
+
+        #ifdef OLED_CONNECTED
         writeToDisplayCentre(3, WHITE, "Written to file.");
+        #endif
       }
        
       Serial.println("Tare complete");
