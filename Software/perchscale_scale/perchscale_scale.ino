@@ -31,7 +31,7 @@
 
 //-----------------CODE SETUP---------------------
 #define OLED_CONNECTED // comment if the OLED will not be attached to the device
-
+#define DEFAULT_THRESHOLD 100 //this is the threshold trigger value for a reading event
 // BLE Server
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -115,7 +115,7 @@ const int calVal_eepromAdress = 0;
 
 // OLED
 #ifdef OLED_CONNECTED
-  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate an SSD1306 display connected to I2C
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); //Instantiate an SSD1306 display connected to I2C
 #endif
 
 // RTC time
@@ -128,7 +128,8 @@ int old_hour; // This is used to check if a new file needs to be created on the 
 char msg[MSG_BUFFER_SIZE];
 char calibrate_msg[1000];
 
-int data_num_readings = 1; // scale readings counter
+int data_num_readings = 1; // how many readings added to message counter
+int reading_number = 1; // scale readings counter
 // BLE Server
 bool deviceConnected = false;
 int value = 0;
@@ -200,7 +201,7 @@ void updateFilePath(fs::FS &fs, DateTime now){
   old_hour = now.hour();
 };
 void writeFile(fs::FS &fs,  const char * path, const char * message){
-    Serial.printf("Writing file: %s\n", path);
+    // Serial.printf("Writing file: %s\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
@@ -276,8 +277,9 @@ void calibrate(String calibration_weight) {
   Serial.println("***");
   Serial.println("Starting calibration for "+ calibration_weight + "g");
   
+  LoadCell.update();
   LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
-  
+  LoadCell.update();
   float calibration_value = LoadCell.getData();
   Serial.println(calibration_value);
   if(!calibration_weight.equals(calibration_weights[0])){ 
@@ -381,190 +383,8 @@ const char* getLogLevelString(Loglevel level) {
   };
 };
 
-//*******************************************************************************************************************************
-//
-
-void setup() {
-  //----------SERIAL SETUP------------------------
-  Serial.begin(9600); // Initialise baud rate with PC
-  Serial.println("\n*************************");
-  Serial.println("Beginning startup routine.");
-
-  //----------OLED SETUP------------------------
-  #ifdef OLED_CONNECTED
-    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
-      Serial.println("Error: OLED not detected/connected.");
-      for(;;);
-    }
-    delay(2000);
-    display.clearDisplay();
-    Serial.println("OLED startup completed.");
-  #endif
-
-  //--------------------RTC SETUP-----------------------
-  Wire.begin(); // required by the RTClib library because I2C is used
-
-  // Check if RTC is connected
-  if (!rtc.begin()) {
-    Serial.println("RTC not found.");
-    while (1);
-  }
-
-  // Write PC time to RTC
-  Serial.println("Setting RTC using connected PC.");
-  rtc.adjust(DateTime(__DATE__, __TIME__));
-  
-  now = rtc.now();
-  char temp[20];
-  sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d",  now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
-  Serial.println(temp);
-
-  Serial.println("RTC started.");
-
-  //--------------------SD CARD SETUP-----------------------
-  // Check if the SD card module is connected
-  if(!SD.begin()){
-    Serial.println("Card Mount Failed.");
-    return;
-  }
-
-  // Check if the SD card is inserted/correctly formatted
-  uint8_t cardType = SD.cardType();
-  if(cardType == CARD_NONE){
-    Serial.println("No SD card attached.");
-    return;
-  }
-
-  Serial.println("SD card mounted.");
-
-  // Create the storage file
-  updateFilePath(SD, now);
-  File file = SD.open(log_file_path, FILE_APPEND);
-  if(!file){
-    writeFile(SD, log_file_path, "Start\n"); // create the file
-  }
-
-  // logMessage(SD, "SD card setup.", INFO_LEVEL);
-
-//----------LOADCELL SETUP------------------------
-  LoadCell.begin();
-  // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
-  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
-  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
-  LoadCell.start(stabilizingtime, _tare);
-
-  if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
-    // logMessage(SD, "Timeout, check MCU>HX711 wiring and pin designations", ERROR_LEVEL);
-    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
-    while (1);
-  }  // else {
-  //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
-  //   Serial.println("Startup is complete");
-  // }
-  LoadCell.setCalFactor(CALIBRATION_FACTOR);
-
-  // Set the threshold value for taking readings based on the last value saved in EEPROM
-  EEPROM.begin(512);
-  EEPROM.get(calVal_eepromAdress, reading_threshold);
-  if(isnan(reading_threshold)){
-    reading_threshold = 1; // ADJUST ACCORDING TO WHAT MAKES SENSE
-  }
-  Serial.println("\nReading threshold value is " + String(reading_threshold));
-  Serial.println("Loadcell startup is complete");
-
-  
-  // logMessage(SD, strcat("Threshold value set to",String(reading_threshold).c_str()),INFO_LEVEL);
-
-  // Serial.println(log_buffer);
- 
-  // logMessage(SD, "Loadcell startup is complete",INFO_LEVEL);
-
-  // Serial.println(log_buffer);
-
-
-  //----------BLE SERVER SETUP------------------------
-  BLEDevice::init("PerchScale");
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new ServerCallbacks());
-
-  //****** CONNECT SERVICE
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-  BLECharacteristic *pCharacteristic =
-    pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-
-  pCharacteristic->setValue("connect");
-  pService->start();
-  //****** WEIGH SERVICE
-  BLEService *weighService = pServer->createService(SERVICE_UUID_WEIGH);
-  
-  readCharacteristic =
-    weighService->createCharacteristic(CHARACTERISTIC_UUID_READ, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-
-  weighService->addCharacteristic(readCharacteristic);
-  readCharacteristic->setValue("read");
-  
-  tareCharacteristic =
-    weighService->createCharacteristic(CHARACTERISTIC_UUID_TARE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-  weighService->addCharacteristic(tareCharacteristic); 
-  tareCharacteristic->setValue("tare"); 
-
-  calibrateCharacteristic =
-    weighService->createCharacteristic(CHARACTERISTIC_UUID_CALIBRATE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-  weighService->addCharacteristic(calibrateCharacteristic); 
-  calibrateCharacteristic->setValue("calibrate"); 
-
-  weighService->start();
-   
-  // BLE Server: Begin advertising services & characteristics
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->addServiceUUID(SERVICE_UUID_WEIGH);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
-  pAdvertising->setMinPreferred(0x12);
-  BLEDevice::startAdvertising();
-  Serial.println("BLE startup is complete. Characteristics are defined and advertised.");
-  // logMessage(SD, "BLE startup is complete. Characteristics are defined and advertised.",INFO_LEVEL);
-  // ----------------------------------------------- 
-
-  // Output that startup is complete on display
-  #ifdef OLED_CONNECTED
-    writeToDisplayCentre(2.5, WHITE, "Startup complete");
-  #endif
-  // logMessage(SD, "Startup complete",INFO_LEVEL);
-  Serial.println("*************************");
-  // Serial.println(log_buffer);
-};
-
-void loop() {
-  // Check the date and time to creat new file paths.
-  now = rtc.now();
-  if(now.hour()!=old_hour){
-    updateFilePath(SD, now);
-  }
-
-  //----------CONTROLLER MODE------------------------
-  // If BLE device is connected, respond according to commands
-  if(deviceConnected){ 
-    if(status == "connected"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Controller connected");
-      #endif
-      //Serial.println("BLE: Controller connected");
-    }else if (status == "tare"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Taring");
-      #endif
-      //Serial.println("Controller mode = tarring");
-    }else if (status == "calibrate"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Calibrating");
-      #endif
-      //Serial.println("Controller mode = calibrate");
-    }else if(status == "read"){
-    }
-
-    //*********** CONTROLLER Read
+void controllerRead(){
+  //*********** CONTROLLER Read
     String readVal = readCharacteristic->getValue().c_str(); // BLE: read characteristic
     // Serial.print("Read:"); Serial.println(readVal);
 
@@ -575,44 +395,45 @@ void loop() {
     } 
     else if (readVal != "read" && readVal != rstMSG) {
       static boolean newDataReady = 0;
-
       // check for new data/start next conversion:
       if (LoadCell.update()) newDataReady = true;
-
       if (newDataReady) {
           float reading = LoadCell.getData();
-          if(reading<reading_threshold & eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
-            boolean _resume = false;
-            boolean _tarewait = true;
-            // RESET readings counter between events
-            data_num_readings = 1;
+          if(reading<reading_threshold){
+            readCharacteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
+            reading_number = 1; // RESET readings counter between events
+            if(eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
+            
+              boolean _resume = false;
+              boolean _tarewait = true;
 
-            while (_resume == false) {
-              LoadCell.update();
-              if(_tarewait){              
-                LoadCell.tareNoDelay();
-                _tarewait = false;
-              }
-              if (LoadCell.getTareStatus() == true) {
-                readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
-                 #ifdef OLED_CONNECTED
-                writeToDisplayCentre(2.5, WHITE, "Tare done");
-                #endif
-
-                Serial.println("Read mode: Next Tare Complete");
-                
-                // Get current time from RTC
-                now = rtc.now();
-                // Record tare event on SD card
-                sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-                if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
-                  // Save to text file on SD card
-                  appendFile(SD, file_name_path, msg);
-                  strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
-                  Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
+              while (_resume == false) {
+                LoadCell.update();
+                if(_tarewait){              
+                  LoadCell.tareNoDelay();
+                  _tarewait = false;
                 }
-                _resume = true;
-                // delay(2000);
+                if (LoadCell.getTareStatus() == true) {
+                  readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
+                  #ifdef OLED_CONNECTED
+                  writeToDisplayCentre(2.5, WHITE, "Tare done");
+                  #endif
+
+                  Serial.println("Read mode: Next Tare Complete");
+                  
+                  // Get current time from RTC
+                  now = rtc.now();
+                  // Record tare event on SD card
+                  sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+                  if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
+                    // Save to text file on SD card
+                    appendFile(SD, file_name_path, msg);
+                    strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
+                    Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
+                  }
+                  _resume = true;
+                  // delay(2000);
+                }
               }
             }
           }
@@ -620,7 +441,7 @@ void loop() {
               // Get current time from RTC
               now = rtc.now();
               // Append the reading to the buffer
-              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
+              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
             
               if(MSG_BUFFER_SIZE-strlen(msg)<=30){
                 // Save to text file on SD card
@@ -637,15 +458,17 @@ void loop() {
               readCharacteristic->setValue(String(reading_msg).c_str()); // BLE: Updating value to scale reading
 
               newDataReady = 0;
+              reading_number++;
               data_num_readings++;
           }
         
       }
       status="read";
     } 
+}
 
-    //*********** CONTROLLER Tare
-    String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
+void controllerTare(){
+  String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
 
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
       Serial.println("Tare mode: Unacceptable tare value received.");
@@ -685,9 +508,10 @@ void loop() {
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
       status = "connected"; // OLED reset the status
     }
+}
 
-    //*********** CONTROLLER Calibrate 
-    String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
+void controllerCalibrate(){
+  String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
     if (calibrateVal == rstMSG) {
       Serial.println("Calibrate mode: Resetting calibrate flag.");
@@ -761,7 +585,7 @@ void loop() {
       Serial.println("Calibrate mode: Written to file.");
 
       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(3, WHITE, "Written to file.");
+        writeToDisplayCentre(3, WHITE, "Written to file.");
       #endif
       
       // Set 'ok' for succesfully saving calibration value
@@ -783,6 +607,233 @@ void loop() {
     }
     
     delay(200);
+}
+
+void logData(fs::FS &fs, String mode, String type, float reading){ 
+  
+  // Check the date and time to creat new file paths.
+  now = rtc.now();
+  if(now.hour()!=old_hour){
+    updateFilePath(SD, now);
+  }
+
+  if(mode.equals("s")){
+    if(type.equals("tare")){
+      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+    }
+    else if(type.equals("read")){
+      // Append the reading to the buffer
+      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
+      reading_number++;
+    }
+    data_num_readings++;
+  }
+
+
+  if(MSG_BUFFER_SIZE-strlen(msg)<=50){
+    // Save to text file on SD card
+    appendFile(SD, file_name_path, msg);
+    // Serial.println(msg);
+
+    strcpy(msg, "");
+    //memset(msg, 0, MSG_BUFFER_SIZE);
+    Serial.println("Written to file. Number of readings: "+ String(reading_number));
+
+    #ifdef OLED_CONNECTED
+      writeToDisplayCentre(3, WHITE, "Written to file.");
+    #endif
+    
+    data_num_readings = 0;
+  }
+
+};
+
+//*******************************************************************************************************************************
+//
+
+void setup() {
+  //----------SERIAL SETUP------------------------
+  Serial.begin(9600); // Initialise baud rate with PC
+  Serial.println("\n*************************");
+  Serial.println("Beginning startup routine.");
+
+  //----------OLED SETUP------------------------
+  #ifdef OLED_CONNECTED
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+      Serial.println("Error: OLED not detected/connected.");
+      for(;;);
+    }
+    delay(2000);
+    display.clearDisplay();
+    Serial.println("OLED startup completed.");
+  #endif
+
+  //--------------------RTC SETUP-----------------------
+  Wire.begin(); // required by the RTClib library because I2C is used
+
+  // Check if RTC is connected
+  if (!rtc.begin()) {
+    Serial.println("RTC not found.");
+    while (1);
+  }
+
+  // Write PC time to RTC
+  Serial.println("Setting RTC using connected PC.");
+  rtc.adjust(DateTime(__DATE__, __TIME__));
+  
+  now = rtc.now();
+  char temp[20];
+  sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d",  now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+  Serial.println(temp);
+
+  Serial.println("RTC started.");
+
+  //--------------------SD CARD SETUP-----------------------
+  // Check if the SD card module is connected
+  if(!SD.begin()){
+    Serial.println("Card Mount Failed.");
+    return;
+  }
+
+  // Check if the SD card is inserted/correctly formatted
+  uint8_t cardType = SD.cardType();
+  if(cardType == CARD_NONE){
+    Serial.println("No SD card attached.");
+    return;
+  }
+
+  Serial.println("SD card mounted.");
+
+  // Create the storage file
+  updateFilePath(SD, now);
+  File file = SD.open(log_file_path, FILE_APPEND);
+  if(!file){
+    writeFile(SD, log_file_path, "Start\n"); // create the file
+  }
+
+  // logMessage(SD, "SD card setup.", INFO_LEVEL);
+
+  //----------LOADCELL SETUP------------------------
+  LoadCell.begin();
+  // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
+  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
+  LoadCell.start(stabilizingtime, true);
+
+  if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
+    // logMessage(SD, "Timeout, check MCU>HX711 wiring and pin designations", ERROR_LEVEL);
+    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
+    while (1);
+  } else {
+    LoadCell.setCalFactor(CALIBRATION_FACTOR);
+  //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
+  //   Serial.println("Startup is complete");
+  }
+  
+  // Set the threshold value for taking readings based on the last value saved in EEPROM
+  EEPROM.begin(512);
+  EEPROM.get(calVal_eepromAdress, reading_threshold);
+  if(isnan(reading_threshold)){
+    reading_threshold = DEFAULT_THRESHOLD; // ADJUST ACCORDING TO WHAT MAKES SENSE
+  }
+  Serial.println("\nReading threshold value is " + String(reading_threshold));
+  Serial.println("Loadcell startup is complete");
+
+  
+  // logMessage(SD, strcat("Threshold value set to",String(reading_threshold).c_str()),INFO_LEVEL);
+
+  // Serial.println(log_buffer);
+ 
+  // logMessage(SD, "Loadcell startup is complete",INFO_LEVEL);
+
+  // Serial.println(log_buffer);
+
+
+  //----------BLE SERVER SETUP------------------------
+  BLEDevice::init("PerchScale");
+  BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new ServerCallbacks());
+
+  //****** CONNECT SERVICE
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  BLECharacteristic *pCharacteristic =
+    pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+
+  pCharacteristic->setValue("connect");
+  pService->start();
+  //****** WEIGH SERVICE
+  BLEService *weighService = pServer->createService(SERVICE_UUID_WEIGH);
+  
+  readCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_READ, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+
+  weighService->addCharacteristic(readCharacteristic);
+  readCharacteristic->setValue("read");
+  
+  tareCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_TARE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  weighService->addCharacteristic(tareCharacteristic); 
+  tareCharacteristic->setValue("tare"); 
+
+  calibrateCharacteristic =
+    weighService->createCharacteristic(CHARACTERISTIC_UUID_CALIBRATE, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  weighService->addCharacteristic(calibrateCharacteristic); 
+  calibrateCharacteristic->setValue("calibrate"); 
+
+  weighService->start();
+   
+  // BLE Server: Begin advertising services & characteristics
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->addServiceUUID(SERVICE_UUID_WEIGH);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+  pAdvertising->setMinPreferred(0x12);
+  BLEDevice::startAdvertising();
+  Serial.println("BLE startup is complete. Characteristics are defined and advertised.");
+  // logMessage(SD, "BLE startup is complete. Characteristics are defined and advertised.",INFO_LEVEL);
+  // ----------------------------------------------- 
+
+  // Output that startup is complete on display
+  #ifdef OLED_CONNECTED
+    writeToDisplayCentre(2.5, WHITE, "Startup complete");
+  #endif
+  // logMessage(SD, "Startup complete",INFO_LEVEL);
+  Serial.println("*************************");
+  // Serial.println(log_buffer);
+};
+
+void loop() {
+  //----------CONTROLLER MODE------------------------
+  // If BLE device is connected, respond according to commands
+  if(deviceConnected){ 
+    if(status == "connected"){
+       #ifdef OLED_CONNECTED
+      writeToDisplayCentre(2.5, WHITE, "Controller connected");
+      #endif
+      //Serial.println("BLE: Controller connected");
+    }else if (status == "tare"){
+       #ifdef OLED_CONNECTED
+      writeToDisplayCentre(2.5, WHITE, "Taring");
+      #endif
+      //Serial.println("Controller mode = tarring");
+    }else if (status == "calibrate"){
+       #ifdef OLED_CONNECTED
+      writeToDisplayCentre(2.5, WHITE, "Calibrating");
+      #endif
+      //Serial.println("Controller mode = calibrate");
+    }else if(status == "read"){
+      // Do nothing because it is reading the scale
+    }
+
+    //*********** CONTROLLER Read
+    controllerRead();
+    
+    //*********** CONTROLLER Tare
+    controllerTare();
+
+    //*********** CONTROLLER Calibrate 
+    controllerCalibrate();
+
   } // End of case where device is connected
   //----------STANDBY MODE------------------------
   // If no controller is connected, read values and save to SD card (no OLED)
@@ -790,74 +841,49 @@ void loop() {
     // Save the readings to file on SD card
     appendFile(SD, file_name_path, msg); // Save the readings to file on SD card
 
-    static boolean newDataReady = 0;
-
     // check for new data/start next conversion:
+    static boolean newDataReady = 0;
     if (LoadCell.update()) newDataReady = true;
 
     if (newDataReady) {
         float reading = LoadCell.getData();
-        if(reading<reading_threshold & eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
-          boolean _resume = false;
-          boolean _tarewait = true;
-          data_num_readings = 1;
-          while (_resume == false) {
-            LoadCell.update();
-            if(_tarewait){              
-              LoadCell.tareNoDelay();
-              _tarewait = false;
-            }
-            if (LoadCell.getTareStatus() == true) {
-              #ifdef OLED_CONNECTED
-              writeToDisplayCentre(2.5, WHITE, "Tare done");
-              #endif
-              
-              // Get current time from RTC
-              now = rtc.now();
-              // Record tare event on SD card
-              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-              if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
-                // Save to text file on SD card
-                appendFile(SD, file_name_path, msg);
-                strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
-                Serial.println("Written to file.");
-
-                #ifdef OLED_CONNECTED
-                writeToDisplayCentre(3, WHITE, "Written to file.");
-                #endif
+        if(reading<reading_threshold){
+          #ifdef OLED_CONNECTED
+            writeToDisplayCentre(2.5, WHITE, "No bird");
+          #endif
+          reading_number = 1;
+          if(eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
+            boolean _resume = false;
+            boolean _tarewait = true;
+            while (_resume == false) {
+              LoadCell.update();
+              if(_tarewait){              
+                LoadCell.tareNoDelay();
+                _tarewait = false;
               }
+              if (LoadCell.getTareStatus() == true) {
+                #ifdef OLED_CONNECTED
+                  writeToDisplayCentre(2.5, WHITE, "Tare done");
+                #endif
 
-              Serial.println("Next Tare Complete");
-              _resume = true;
-              // delay(2000);
+                logData(SD, "s", "tare",0);
+
+                Serial.println("Next Tare Complete");
+                _resume = true;
+                // delay(2000);
+              }
             }
           }
         }
         else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
             String reading_msg = String(reading) + "g";
             #ifdef OLED_CONNECTED
-            writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+              writeToDisplayCentre(3, WHITE, reading_msg.c_str());
             #endif
-            
-            // Get current time from RTC
-            now = rtc.now();
-            // Append the reading to the buffer
-            sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), data_num_readings, reading); 
-            // Serial.println(msg);
-            // Serial.println(String(strlen(msg)));
-            if(MSG_BUFFER_SIZE-strlen(msg)<=30){
-              // Save to text file on SD card
-              appendFile(SD, file_name_path, msg);
-              strcpy(msg, "");
-              //memset(msg, 0, MSG_BUFFER_SIZE);
-              Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
 
-              #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, "Written to file.");
-              #endif
-            }  
+            logData(SD, "s", "read", reading);
+
             newDataReady = 0;
-            data_num_readings++;
         }
       
     }
@@ -869,21 +895,7 @@ void loop() {
       writeToDisplayCentre(2.5, WHITE, "Tare done");
       #endif
 
-      // Get current time from RTC
-      now = rtc.now();
-      // Record tare event
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
-      if(MSG_BUFFER_SIZE-strlen(msg)<=30){
-        // Save to text file on SD card
-        appendFile(SD, file_name_path, msg);
-        strcpy(msg, "");
-        //memset(msg, 0, MSG_BUFFER_SIZE);
-        Serial.println("Written to file.");
-
-        #ifdef OLED_CONNECTED
-        writeToDisplayCentre(3, WHITE, "Written to file.");
-        #endif
-      }
+      logData(SD, "s", "tare",0);
        
       Serial.println("Tare complete");
     }
