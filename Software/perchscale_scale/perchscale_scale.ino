@@ -73,8 +73,11 @@
 
 //--------------------DEFINES-------------------------
 #define eigthseconds (millis()/125) // Taring delay
-#define MSG_BUFFER_SIZE 4000 
 #define TIME_STRING_SIZE 11
+
+#define MSG_BUFFER_SIZE 4000 
+#define LOG_BUFFER_SIZE 1000
+#define log_file_path "/log.txt"
 
 // OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -124,9 +127,11 @@ DateTime now;
 char rtc_time_str[TIME_STRING_SIZE];
 int old_hour; // This is used to check if a new file needs to be created on the SD card
 
-// SD card msg
-char msg[MSG_BUFFER_SIZE];
-char calibrate_msg[1000];
+// SD card data_msg
+char data_msg[MSG_BUFFER_SIZE];
+char calibrate_data_msg[1000];
+char log_buffer[LOG_BUFFER_SIZE];
+char msg[100]; // this is a temporary variable used in some places when string formatting is needed.
 
 int data_num_readings = 1; // how many readings added to message counter
 int reading_number = 1; // scale readings counter
@@ -141,9 +146,8 @@ BLECharacteristic *tareCharacteristic;
 BLECharacteristic *calibrateCharacteristic;
 String status = "-1";
 
-#define log_file_path "/log.txt"
-#define LOG_BUFFER_SIZE 500
-char log_buffer[LOG_BUFFER_SIZE];
+
+
 enum Loglevel {
   INFO_LEVEL,
   WARNING_LEVEL,
@@ -154,10 +158,41 @@ enum Loglevel {
 
 //------------------------------------------------------
 //------------------HELPER FUNCTIONS------------------------
+void logMessage(fs::FS &fs, const char * message, Loglevel level){
+  // Check if the message level meets the minimum log level
+  if (level < MIN_LOG_LEVEL) return;
+
+  now = rtc.now();
+  char log_data_msg [100];
+  sprintf(log_data_msg, "%02d:%02d:%02d,%02d/%02d/%02d [%s] %s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), getLogLevelString(level), message);
+  
+
+  if(strlen(log_buffer)+strlen(log_data_msg)<LOG_BUFFER_SIZE){
+    strcat(log_buffer,log_data_msg);
+  }else{
+    // start writing from the start of the buffer
+    appendFile(SD,  log_file_path, log_buffer);
+    strcpy(log_buffer,"");
+    strcat(log_buffer,log_data_msg);
+  }
+
+  // IF x HOURS HAVE PASSED THEN WRITE TO THE FILE - MAYBE AFTER THE FILES HAVE BEEN UPDATED?
+};
+// Helper function to convert log level to a string
+const char* getLogLevelString(Loglevel level) {
+  switch (level) {
+    case INFO_LEVEL: return "INFO";
+    case WARNING_LEVEL: return "WARNING";
+    case ERROR_LEVEL: return "ERROR";
+    default: return "?";
+  };
+};
+
 class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
       Serial.println("BLE: Device Connected.");
+      // logMessage(SD, "BLE: Device Connected.",INFO_LEVEL);
       status = "connected"; // OLED set the status
     };
 
@@ -165,6 +200,7 @@ class ServerCallbacks: public BLEServerCallbacks {
       deviceConnected = false;
       status = "-1"; // OLED reset the status
       Serial.println("BLE: Device Disconnected.");
+      // logMessage(SD, "BLE: Device Disconnected.",INFO_LEVEL);
       delay(500); // give the bluetooth stack the chance to get things ready
 
       // RESET ALL CHARACTERISTICS
@@ -172,13 +208,14 @@ class ServerCallbacks: public BLEServerCallbacks {
       tareCharacteristic->setValue("tare"); 
       calibrateCharacteristic->setValue("calibrate"); 
       Serial.println("BLE: Reset characteristics.");
+      // logMessage(SD, "BLE: Reset characteristics.",INFO_LEVEL);
 
       BLEDevice::startAdvertising();
       Serial.println("BLE: Started re-advertising.");
-
-
+      // logMessage(SD, "BLE: Started re-advertising.",INFO_LEVEL);
     }
 };
+
 void updateFilePath(fs::FS &fs, DateTime now){
   sprintf(rtc_time_str, "%02d%02d%02d%02d",now.year(), now.month(), now.day(), now.hour());
   
@@ -188,30 +225,33 @@ void updateFilePath(fs::FS &fs, DateTime now){
   // Print the file names
   Serial.println("Data file path: " + String(file_name_path));
   Serial.println("Calibration values file path: " + String(calibrate_file_name_path));
+  // logMessage(SD, "SD: Updated data and calibration file paths",INFO_LEVEL);
+  
     
   // Check if the file already exists so that it is not overwritten
   File file = fs.open(file_name_path, FILE_APPEND);
   if(!file){
     writeFile(fs, file_name_path, "Start\n"); // create the file
   }
+
   file = fs.open(calibrate_file_name_path, FILE_APPEND);
   if(!file){
     writeFile(fs, calibrate_file_name_path, "Start\n"); // create the file
   }
+
   old_hour = now.hour();
 };
 void writeFile(fs::FS &fs,  const char * path, const char * message){
-    // Serial.printf("Writing file: %s\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
+        // logMessage(SD, strcat("SD: Failed to open file for writing, ",String(path).c_str()),ERROR_LEVEL);
         Serial.println("Failed to open file for writing");
         return;
     }
     if(file.print(message)){
         Serial.println("File written");
-    } else {
-        Serial.println("Write failed");
+        // logMessage(SD, strcat("SD: Written to file, ",String(path).c_str()),INFO_LEVEL);
     }
     file.close();
 };
@@ -221,33 +261,30 @@ void appendFile(fs::FS &fs,  const char * path, const char * message){
     File file = fs.open(path, FILE_APPEND);
     if(!file){
         Serial.println("Failed to open file for appending");
+        // logMessage(SD, strcat("SD: Failed to open file for appending, ",String(path).c_str()),ERROR_LEVEL);
         writeFile(fs, path, message); // create the file
         return;
     }
-    file.print(message);
-    // if(file.print(message)){
-    //     Serial.println("Message appended");
-    // } else {
-    //     Serial.println("Append failed");
-    // }
     file.close();
 };
 void deleteFile(fs::FS &fs,  const char * path){
     Serial.printf("Deleting file: %s\n", path);
     if(fs.remove(path)){
         Serial.println("File deleted");
+        // logMessage(SD, strcat("SD: Deleted file, ",String(path).c_str()),INFO_LEVEL);
     } else {
         Serial.println("Delete failed");
+        // logMessage(SD, strcat("SD: Failed to delete file, ",String(path).c_str()),WARNING_LEVEL);
     }
 };
 
 #ifdef OLED_CONNECTED
-void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* msgToPrint) {
+void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* data_msgToPrint) {
   display.clearDisplay();
   display.setTextSize(textSize);
   display.setTextColor(textColour);
   display.setCursor(cursorX, cursorY);
-  display.print(msgToPrint);
+  display.print(data_msgToPrint);
   display.display(); 
 };
 
@@ -283,10 +320,10 @@ void calibrate(String calibration_weight) {
   float calibration_value = LoadCell.getData();
   Serial.println(calibration_value);
   if(!calibration_weight.equals(calibration_weights[0])){ 
-    sprintf(calibrate_msg, "%s,%s,%.2f", calibrate_msg, calibration_weight, calibration_value); 
+    sprintf(calibrate_data_msg, "%s,%s,%.2f", calibrate_data_msg, calibration_weight, calibration_value); 
   }
   else {
-    sprintf(calibrate_msg, "%s,%.2f", calibration_weight, calibration_value); 
+    sprintf(calibrate_data_msg, "%s,%.2f", calibration_weight, calibration_value); 
     
     // Update the reading threshold value based on the lowest calibration value
     reading_threshold = calibration_value; 
@@ -299,36 +336,9 @@ void calibrate(String calibration_weight) {
   }
 
   calibrate_complete_flag = true;
-  Serial.println(calibrate_msg);
+  Serial.println(calibrate_data_msg);
   Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
   Serial.println("***");
-};
-
-void logMessage(fs::FS &fs, const char * message, Loglevel level){
-  // Check if the message level meets the minimum log level
-  if (level < MIN_LOG_LEVEL) return;
-
-  now = rtc.now();
-  char log_msg [100];
-  sprintf(log_msg, "%02d:%02d:%02d,%02d/%02d/%02d [%s] %s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), getLogLevelString(level), message);
-  
-  if(sizeof(log_buffer)+sizeof(log_msg)<LOG_BUFFER_SIZE){
-    strcat(log_buffer,log_msg);
-  }else{
-    appendFile(SD,  log_file_path, log_buffer);
-    memset(log_buffer, 0, LOG_BUFFER_SIZE); // Set all bytes in buffer to 0
-    strcat(log_buffer,log_msg);
-  }
-};
-
-// Helper function to convert log level to a string
-const char* getLogLevelString(Loglevel level) {
-  switch (level) {
-    case INFO_LEVEL: return "INFO";
-    case WARNING_LEVEL: return "WARNING";
-    case ERROR_LEVEL: return "ERROR";
-    default: return "?";
-  };
 };
 
 void controllerRead(){
@@ -372,11 +382,11 @@ void controllerRead(){
                   // Get current time from RTC
                   now = rtc.now();
                   // Record tare event on SD card
-                  sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-                  if(MSG_BUFFER_SIZE-strlen(msg)<=30){ //28 is the size of one recorded event string
+                  sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+                  if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){ //28 is the size of one recorded event string
                     // Save to text file on SD card
-                    appendFile(SD, file_name_path, msg);
-                    strcpy(msg, ""); //memset(msg, 0, MSG_BUFFER_SIZE);
+                    appendFile(SD, file_name_path, data_msg);
+                    strcpy(data_msg, ""); //memset(data_msg, 0, MSG_BUFFER_SIZE);
                     Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
                   }
                   _resume = true;
@@ -389,21 +399,21 @@ void controllerRead(){
               // Get current time from RTC
               now = rtc.now();
               // Append the reading to the buffer
-              sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
+              sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
             
-              if(MSG_BUFFER_SIZE-strlen(msg)<=30){
+              if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){
                 // Save to text file on SD card
-                appendFile(SD, file_name_path, msg);
-                strcpy(msg, "");
-                //memset(msg, 0, MSG_BUFFER_SIZE);
+                appendFile(SD, file_name_path, data_msg);
+                strcpy(data_msg, "");
+                //memset(data_msg, 0, MSG_BUFFER_SIZE);
                 Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
               }
-              String reading_msg = String(reading) + "g";
+              String reading_data_msg = String(reading) + "g";
                #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
               #endif
 
-              readCharacteristic->setValue(String(reading_msg).c_str()); // BLE: Updating value to scale reading
+              readCharacteristic->setValue(String(reading_data_msg).c_str()); // BLE: Updating value to scale reading
 
               newDataReady = 0;
               reading_number++;
@@ -414,7 +424,6 @@ void controllerRead(){
       status="read";
     } 
 }
-
 void controllerTare(){
   String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
 
@@ -434,13 +443,13 @@ void controllerTare(){
       // Get current time from RTC
       now = rtc.now();
       // Record tare event
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
+      sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
 
-      if(MSG_BUFFER_SIZE-strlen(msg)<=30){
+      if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){
         // Save to text file on SD card
-        appendFile(SD, file_name_path, msg);
-        strcpy(msg, "");
-        //memset(msg, 0, MSG_BUFFER_SIZE);
+        appendFile(SD, file_name_path, data_msg);
+        strcpy(data_msg, "");
+        //memset(data_msg, 0, MSG_BUFFER_SIZE);
         Serial.println("Tare mode: Written to file.");
 
         #ifdef OLED_CONNECTED
@@ -457,7 +466,6 @@ void controllerTare(){
       status = "connected"; // OLED reset the status
     }
 }
-
 void controllerCalibrate(){
   String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
@@ -473,13 +481,13 @@ void controllerCalibrate(){
     }else if(calibrateVal == "save"){
       Serial.println("Calibrate mode: Saving Calibration point values");
 
-      sprintf(calibrate_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
-      Serial.println(strlen(calibrate_msg));
+      sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+      Serial.println(strlen(calibrate_data_msg));
       // Save to text file on SD card
-      appendFile(SD, calibrate_file_name_path, calibrate_msg);
-      appendFile(SD, file_name_path, calibrate_msg);
-      strcpy(calibrate_msg, "");
-      //memset(msg, 0, MSG_BUFFER_SIZE);
+      appendFile(SD, calibrate_file_name_path, calibrate_data_msg);
+      appendFile(SD, file_name_path, calibrate_data_msg);
+      strcpy(calibrate_data_msg, "");
+      //memset(data_msg, 0, MSG_BUFFER_SIZE);
       Serial.println("Calibrate mode: Written to file.");
 
       #ifdef OLED_CONNECTED
@@ -513,7 +521,8 @@ void controllerCalibrate(){
 }
 
 void logData(fs::FS &fs, String mode, String type, float reading){ 
-  
+  char msg[100];
+
   // Check the date and time to creat new file paths.
   now = rtc.now();
   if(now.hour()!=old_hour){
@@ -522,32 +531,34 @@ void logData(fs::FS &fs, String mode, String type, float reading){
 
   if(mode.equals("s")){
     if(type.equals("tare")){
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+      sprintf(msg, "%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
     }
     else if(type.equals("read")){
       // Append the reading to the buffer
-      sprintf(msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
+      sprintf(msg, "%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
       reading_number++;
     }
-    data_num_readings++;
   }
 
-  if(MSG_BUFFER_SIZE-strlen(msg)<=50){
+  if(strlen(data_msg)+strlen(msg)> MSG_BUFFER_SIZE){
     // Save to text file on SD card
-    appendFile(SD, file_name_path, msg);
-    // Serial.println(msg);
+    appendFile(SD, file_name_path, data_msg);
 
-    strcpy(msg, "");
-    //memset(msg, 0, MSG_BUFFER_SIZE);
     Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
+    // logMessage(SD, strcat("SD: Written data to file, ",String(file_name_path).c_str()),INFO_LEVEL);
 
     #ifdef OLED_CONNECTED
       writeToDisplayCentre(3, WHITE, "Written to file.");
     #endif
     
-    data_num_readings = 0;
-  }
+    strcpy(data_msg, "");
+    strcat(data_msg,msg);
+    data_num_readings = 1;
 
+  }else{
+    strcat(data_msg,msg);
+    data_num_readings++;
+  }
 };
 
 //*******************************************************************************************************************************
@@ -563,7 +574,6 @@ void setup() {
   #ifdef OLED_CONNECTED
     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
       Serial.println("Error: OLED not detected/connected.");
-      for(;;);
     }
     delay(2000);
     display.clearDisplay();
@@ -700,6 +710,7 @@ void setup() {
     writeToDisplayCentre(2.5, WHITE, "Startup complete");
   #endif
   // logMessage(SD, "Startup complete",INFO_LEVEL);
+  Serial.println("Startup complete");
   Serial.println("*************************");
   // Serial.println(log_buffer);
 };
@@ -740,13 +751,9 @@ void loop() {
   //----------STANDBY MODE------------------------
   // If no controller is connected, read values and save to SD card (no OLED)
   else if(!deviceConnected){
-    // Save the readings to file on SD card
-    appendFile(SD, file_name_path, msg); // Save the readings to file on SD card
-
     // check for new data/start next conversion:
     static boolean newDataReady = 0;
     if (LoadCell.update()) newDataReady = true;
-
     if (newDataReady) {
         float reading = LoadCell.getData();
         if(reading<reading_threshold){
@@ -772,17 +779,18 @@ void loop() {
 
                 Serial.println("Next Tare Complete");
                 _resume = true;
-                // delay(2000);
+                delay(2000);
               }
             }
           }
         }
         else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
-            String reading_msg = String(reading) + "g";
+            String reading_data_msg = String(reading);// + "g";
             #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, reading_msg.c_str());
+              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
             #endif
 
+            // Serial.println(reading_data_msg);
             logData(SD, "s", "read", reading);
 
             newDataReady = 0;
