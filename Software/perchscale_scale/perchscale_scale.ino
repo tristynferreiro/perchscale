@@ -99,13 +99,13 @@ const int NUM_POINTS = 7; // number of items in the list
 const int MAX_ITEM_LENGTH = 4; // maximum characters for the item name
 
 char calibration_weights [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of calibration weights used (in grams)
-  { "105" }, 
-  { "120" }, 
-  { "155" },
-  { "190" },
-  { "225" },
-  { "260" },
-  { "275" }
+  { "50" }, 
+  { "60" }, 
+  { "70" },
+  { "90" },
+  { "100" },
+  { "110" },
+  { "150" }
  };
 bool calibrate_complete_flag = false;
 float reading_threshold;
@@ -628,7 +628,6 @@ void logData(fs::FS &fs, String mode, String type, float reading){
     }
     data_num_readings++;
   }
-
 
   if(MSG_BUFFER_SIZE-strlen(msg)<=50){
     // Save to text file on SD card

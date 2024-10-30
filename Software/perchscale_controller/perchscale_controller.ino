@@ -137,14 +137,15 @@ int button_back_clicked = 0; // same as above
 int calibrate_weight = 10;
 const int NUM_POINTS = 7; // number of items in the list
 int calibration_weights [NUM_POINTS] = {  // List of calibration weights used (in grams)
-   105 , 
-   120 , 
-   155 ,
-   190 ,
-   225 ,
-   260 ,
-   275 
- };
+  50,
+  60,
+  70,
+  90,
+  100,
+  110,
+  150
+};
+
 // ************* BLE CLIENT ******************************
 static String rstMsg = "rst";
 static String doneMsg = "done";
