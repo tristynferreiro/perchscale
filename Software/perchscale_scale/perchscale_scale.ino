@@ -637,7 +637,7 @@ void logData(fs::FS &fs, String mode, String type, float reading){
 
     strcpy(msg, "");
     //memset(msg, 0, MSG_BUFFER_SIZE);
-    Serial.println("Written to file. Number of readings: "+ String(reading_number));
+    Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
 
     #ifdef OLED_CONNECTED
       writeToDisplayCentre(3, WHITE, "Written to file.");
