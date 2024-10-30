@@ -550,17 +550,17 @@ void loop() {
        #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Controller connected");
       #endif
-      Serial.println("BLE: Controller connected");
+      //Serial.println("BLE: Controller connected");
     }else if (status == "tare"){
        #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Taring");
       #endif
-      Serial.println("Controller mode = tarring");
+      //Serial.println("Controller mode = tarring");
     }else if (status == "calibrate"){
        #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Calibrating");
       #endif
-      Serial.println("Controller mode = calibrate");
+      //Serial.println("Controller mode = calibrate");
     }else if(status == "read"){
     }
 
