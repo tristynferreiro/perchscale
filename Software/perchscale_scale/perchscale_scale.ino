@@ -78,6 +78,7 @@
 #define MSG_BUFFER_SIZE 4000 
 #define LOG_BUFFER_SIZE 1000
 #define log_file_path "/log.txt"
+#define MIN_LOG_LEVEL INFO_LEVEL
 
 // OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -146,15 +147,11 @@ BLECharacteristic *tareCharacteristic;
 BLECharacteristic *calibrateCharacteristic;
 String status = "-1";
 
-
-
 enum Loglevel {
   INFO_LEVEL,
   WARNING_LEVEL,
   ERROR_LEVEL
 };
-
-#define MIN_LOG_LEVEL INFO_LEVEL
 
 //------------------------------------------------------
 //------------------HELPER FUNCTIONS------------------------
@@ -379,16 +376,8 @@ void controllerRead(){
 
                   Serial.println("Read mode: Next Tare Complete");
                   
-                  // Get current time from RTC
-                  now = rtc.now();
-                  // Record tare event on SD card
-                  sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
-                  if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){ //28 is the size of one recorded event string
-                    // Save to text file on SD card
-                    appendFile(SD, file_name_path, data_msg);
-                    strcpy(data_msg, ""); //memset(data_msg, 0, MSG_BUFFER_SIZE);
-                    Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
-                  }
+                  logData(SD, "c","tare",0);
+                  
                   _resume = true;
                   // delay(2000);
                 }
@@ -396,18 +385,9 @@ void controllerRead(){
             }
           }
           else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
-              // Get current time from RTC
-              now = rtc.now();
-              // Append the reading to the buffer
-              sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
-            
-              if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){
-                // Save to text file on SD card
-                appendFile(SD, file_name_path, data_msg);
-                strcpy(data_msg, "");
-                //memset(data_msg, 0, MSG_BUFFER_SIZE);
-                Serial.println("Read mode: Written to file. Number of readings: "+ String(data_num_readings));
-              }
+              
+              logData(SD,"c","read",reading);
+
               String reading_data_msg = String(reading) + "g";
                #ifdef OLED_CONNECTED
               writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
@@ -429,6 +409,7 @@ void controllerTare(){
 
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
       Serial.println("Tare mode: Unacceptable tare value received.");
+      // logMessage(SD, "Tare mode: Unacceptable tare value received.", ERROR_LEVEL);
       tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     } 
     if (tareVal == "t") {
@@ -440,22 +421,7 @@ void controllerTare(){
       writeToDisplayCentre(2.5, WHITE, "Tare done");
       #endif
       
-      // Get current time from RTC
-      now = rtc.now();
-      // Record tare event
-      sprintf(data_msg, "%s%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n",  data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0); 
-
-      if(MSG_BUFFER_SIZE-strlen(data_msg)<=30){
-        // Save to text file on SD card
-        appendFile(SD, file_name_path, data_msg);
-        strcpy(data_msg, "");
-        //memset(data_msg, 0, MSG_BUFFER_SIZE);
-        Serial.println("Tare mode: Written to file.");
-
-        #ifdef OLED_CONNECTED
-        writeToDisplayCentre(3, WHITE, "Written to file.");
-        #endif
-      }
+      logData(SD, "c","tare",0);
 
       tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
       Serial.println("Tare mode: Tare complete");
@@ -463,6 +429,7 @@ void controllerTare(){
     else if (tareVal == rstMSG) {
       Serial.println("Tare mode: Resetting tare flag.");
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
+      // logMessage(SD, "Tare mode: Tare complete.", INFO_LEVEL);
       status = "connected"; // OLED reset the status
     }
 }
@@ -471,6 +438,7 @@ void controllerCalibrate(){
 
     if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
       Serial.println("Calibrate mode: Unacceptable calibrate value received.");
+      // logMessage(SD, strcat("Calibrate mode: Unacceptable calibrate value received, ",calibrateVal.c_str()),ERROR_LEVEL);
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
 
@@ -502,6 +470,7 @@ void controllerCalibrate(){
       Serial.println("Calibrate mode: Calibrate DONE command received");
       if(!calibrate_complete_flag){
         Serial.println("Calibrate mode: Setting flag to ok");
+        // logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }else{
@@ -538,6 +507,15 @@ void logData(fs::FS &fs, String mode, String type, float reading){
       sprintf(msg, "%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,s\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
       reading_number++;
     }
+  }else if(mode.equals("c")){
+    if(type.equals("tare")){
+      sprintf(msg, "%02d:%02d:%02d,%02d/%02d/%02d,%d,tare,c\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), 0);
+    }
+    else if(type.equals("read")){
+      // Append the reading to the buffer
+      sprintf(msg, "%02d:%02d:%02d,%02d/%02d/%02d,%03d,%.4f,c\n", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(), reading_number, reading); 
+      reading_number++;
+    }
   }
 
   if(strlen(data_msg)+strlen(msg)> MSG_BUFFER_SIZE){
@@ -545,7 +523,6 @@ void logData(fs::FS &fs, String mode, String type, float reading){
     appendFile(SD, file_name_path, data_msg);
 
     Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
-    // logMessage(SD, strcat("SD: Written data to file, ",String(file_name_path).c_str()),INFO_LEVEL);
 
     #ifdef OLED_CONNECTED
       writeToDisplayCentre(3, WHITE, "Written to file.");
@@ -632,7 +609,7 @@ void setup() {
   LoadCell.start(stabilizingtime, true);
 
   if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
-    // logMessage(SD, "Timeout, check MCU>HX711 wiring and pin designations", ERROR_LEVEL);
+    // logMessage(SD, "Loadcell: Timeout, check MCU->HX711 wiring and pin designations", ERROR_LEVEL);
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
   } else {
@@ -648,16 +625,9 @@ void setup() {
     reading_threshold = DEFAULT_THRESHOLD; // ADJUST ACCORDING TO WHAT MAKES SENSE
   }
   Serial.println("\nReading threshold value is " + String(reading_threshold));
+  // logMessage(SD, strcat("Reading threshold value is ",String(reading_threshold).c_str()), INFO_LEVEL);
   Serial.println("Loadcell startup is complete");
-
-  
-  // logMessage(SD, strcat("Threshold value set to",String(reading_threshold).c_str()),INFO_LEVEL);
-
-  // Serial.println(log_buffer);
- 
-  // logMessage(SD, "Loadcell startup is complete",INFO_LEVEL);
-
-  // Serial.println(log_buffer);
+  // logMessage(SD, "Loadcell startup is complete", INFO_LEVEL);
 
 
   //----------BLE SERVER SETUP------------------------
