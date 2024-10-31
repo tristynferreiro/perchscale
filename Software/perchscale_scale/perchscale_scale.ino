@@ -171,6 +171,7 @@ void logMessage(fs::FS &fs, const char * message, Loglevel level){
     appendFile(SD,  log_file_path, log_buffer);
     strcpy(log_buffer,"");
     strcat(log_buffer,log_data_msg);
+    Serial.println("Written to log file.");
   }
 
   // IF x HOURS HAVE PASSED THEN WRITE TO THE FILE - MAYBE AFTER THE FILES HAVE BEEN UPDATED?
@@ -189,7 +190,7 @@ class ServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
       Serial.println("BLE: Device Connected.");
-      // logMessage(SD, "BLE: Device Connected.",INFO_LEVEL);
+      logMessage(SD, "BLE: Device Connected.",INFO_LEVEL);
       status = "connected"; // OLED set the status
     };
 
@@ -197,7 +198,7 @@ class ServerCallbacks: public BLEServerCallbacks {
       deviceConnected = false;
       status = "-1"; // OLED reset the status
       Serial.println("BLE: Device Disconnected.");
-      // logMessage(SD, "BLE: Device Disconnected.",INFO_LEVEL);
+      logMessage(SD, "BLE: Device Disconnected.",INFO_LEVEL);
       delay(500); // give the bluetooth stack the chance to get things ready
 
       // RESET ALL CHARACTERISTICS
@@ -205,11 +206,11 @@ class ServerCallbacks: public BLEServerCallbacks {
       tareCharacteristic->setValue("tare"); 
       calibrateCharacteristic->setValue("calibrate"); 
       Serial.println("BLE: Reset characteristics.");
-      // logMessage(SD, "BLE: Reset characteristics.",INFO_LEVEL);
+      logMessage(SD, "BLE: Reset characteristics.",INFO_LEVEL);
 
       BLEDevice::startAdvertising();
       Serial.println("BLE: Started re-advertising.");
-      // logMessage(SD, "BLE: Started re-advertising.",INFO_LEVEL);
+      logMessage(SD, "BLE: Started re-advertising.",INFO_LEVEL);
     }
 };
 
@@ -222,7 +223,7 @@ void updateFilePath(fs::FS &fs, DateTime now){
   // Print the file names
   Serial.println("Data file path: " + String(file_name_path));
   Serial.println("Calibration values file path: " + String(calibrate_file_name_path));
-  // logMessage(SD, "SD: Updated data and calibration file paths",INFO_LEVEL);
+  logMessage(SD, "SD: Updated data and calibration file paths",INFO_LEVEL);
   
     
   // Check if the file already exists so that it is not overwritten
@@ -242,13 +243,13 @@ void writeFile(fs::FS &fs,  const char * path, const char * message){
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
-        // logMessage(SD, strcat("SD: Failed to open file for writing, ",String(path).c_str()),ERROR_LEVEL);
+        logMessage(SD, ("SD: Failed to open file for writing, " + String(path)).c_str(),ERROR_LEVEL);
         Serial.println("Failed to open file for writing");
         return;
     }
     if(file.print(message)){
         Serial.println("File written");
-        // logMessage(SD, strcat("SD: Written to file, ",String(path).c_str()),INFO_LEVEL);
+        logMessage(SD, ("SD: Written to file, " + String(path)).c_str(),INFO_LEVEL);
     }
     file.close();
 };
@@ -258,7 +259,7 @@ void appendFile(fs::FS &fs,  const char * path, const char * message){
     File file = fs.open(path, FILE_APPEND);
     if(!file){
         Serial.println("Failed to open file for appending");
-        // logMessage(SD, strcat("SD: Failed to open file for appending, ",String(path).c_str()),ERROR_LEVEL);
+        logMessage(SD, strcat("SD: Failed to open file for appending, ",String(path).c_str()),ERROR_LEVEL);
         writeFile(fs, path, message); // create the file
         return;
     }
@@ -268,10 +269,10 @@ void deleteFile(fs::FS &fs,  const char * path){
     Serial.printf("Deleting file: %s\n", path);
     if(fs.remove(path)){
         Serial.println("File deleted");
-        // logMessage(SD, strcat("SD: Deleted file, ",String(path).c_str()),INFO_LEVEL);
+        logMessage(SD, ("SD: Deleted file, " + String(path)).c_str(),INFO_LEVEL);
     } else {
         Serial.println("Delete failed");
-        // logMessage(SD, strcat("SD: Failed to delete file, ",String(path).c_str()),WARNING_LEVEL);
+        logMessage(SD, ("SD: Failed to delete file, " + String(path)).c_str(),WARNING_LEVEL);
     }
 };
 
@@ -303,7 +304,7 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
 };
 #endif
 
-void calibrate(String calibration_weight) {
+void getCalibratePoints(String calibration_weight) {
   #ifdef OLED_CONNECTED
     writeToDisplayCentre(2, WHITE, "Calibrating...");
   #endif
@@ -409,7 +410,7 @@ void controllerTare(){
 
     if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
       Serial.println("Tare mode: Unacceptable tare value received.");
-      // logMessage(SD, "Tare mode: Unacceptable tare value received.", ERROR_LEVEL);
+      logMessage(SD, "Tare mode: Unacceptable tare value received.", ERROR_LEVEL);
       tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     } 
     if (tareVal == "t") {
@@ -429,7 +430,7 @@ void controllerTare(){
     else if (tareVal == rstMSG) {
       Serial.println("Tare mode: Resetting tare flag.");
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
-      // logMessage(SD, "Tare mode: Tare complete.", INFO_LEVEL);
+      logMessage(SD, "Tare mode: Tare complete.", INFO_LEVEL);
       status = "connected"; // OLED reset the status
     }
 }
@@ -438,7 +439,7 @@ void controllerCalibrate(){
 
     if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
       Serial.println("Calibrate mode: Unacceptable calibrate value received.");
-      // logMessage(SD, strcat("Calibrate mode: Unacceptable calibrate value received, ",calibrateVal.c_str()),ERROR_LEVEL);
+      logMessage(SD, ("Calibrate mode: Unacceptable calibrate value received, "+ calibrateVal).c_str(),ERROR_LEVEL);
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
 
@@ -470,7 +471,7 @@ void controllerCalibrate(){
       Serial.println("Calibrate mode: Calibrate DONE command received");
       if(!calibrate_complete_flag){
         Serial.println("Calibrate mode: Setting flag to ok");
-        // logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
+        logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
         calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       }
     }else{
@@ -480,7 +481,7 @@ void controllerCalibrate(){
           Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
         
           if(!calibrate_complete_flag){
-            calibrate(calibrateVal);
+            getCalibratePoints(calibrateVal);
             calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
           }
         }
@@ -523,6 +524,7 @@ void logData(fs::FS &fs, String mode, String type, float reading){
     appendFile(SD, file_name_path, data_msg);
 
     Serial.println("Written to file. Number of readings: "+ String(data_num_readings));
+    logMessage(SD, ("Written to file. Number of readings: "+ String(data_num_readings)).c_str(),INFO_LEVEL);
 
     #ifdef OLED_CONNECTED
       writeToDisplayCentre(3, WHITE, "Written to file.");
@@ -600,7 +602,7 @@ void setup() {
     writeFile(SD, log_file_path, "Start\n"); // create the file
   }
 
-  // logMessage(SD, "SD card setup.", INFO_LEVEL);
+  logMessage(SD, "SD: setup complete.", INFO_LEVEL);
 
   //----------LOADCELL SETUP------------------------
   LoadCell.begin();
@@ -609,7 +611,7 @@ void setup() {
   LoadCell.start(stabilizingtime, true);
 
   if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
-    // logMessage(SD, "Loadcell: Timeout, check MCU->HX711 wiring and pin designations", ERROR_LEVEL);
+    logMessage(SD, "Loadcell: Timeout, check MCU->HX711 wiring and pin designations", ERROR_LEVEL);
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
   } else {
@@ -625,10 +627,9 @@ void setup() {
     reading_threshold = DEFAULT_THRESHOLD; // ADJUST ACCORDING TO WHAT MAKES SENSE
   }
   Serial.println("\nReading threshold value is " + String(reading_threshold));
-  // logMessage(SD, strcat("Reading threshold value is ",String(reading_threshold).c_str()), INFO_LEVEL);
+  logMessage(SD, ("Reading threshold value is set to "+ String(reading_threshold)).c_str(), INFO_LEVEL);
   Serial.println("Loadcell startup is complete");
-  // logMessage(SD, "Loadcell startup is complete", INFO_LEVEL);
-
+  logMessage(SD, "Loadcell: startup complete", INFO_LEVEL);
 
   //----------BLE SERVER SETUP------------------------
   BLEDevice::init("PerchScale");
@@ -672,14 +673,14 @@ void setup() {
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
   Serial.println("BLE startup is complete. Characteristics are defined and advertised.");
-  // logMessage(SD, "BLE startup is complete. Characteristics are defined and advertised.",INFO_LEVEL);
+  logMessage(SD, "BLE startup is complete. Characteristics are defined and advertised.",INFO_LEVEL);
   // ----------------------------------------------- 
 
   // Output that startup is complete on display
   #ifdef OLED_CONNECTED
     writeToDisplayCentre(2.5, WHITE, "Startup complete");
   #endif
-  // logMessage(SD, "Startup complete",INFO_LEVEL);
+  logMessage(SD, "Startup complete",INFO_LEVEL);
   Serial.println("Startup complete");
   Serial.println("*************************");
   // Serial.println(log_buffer);
