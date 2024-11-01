@@ -32,6 +32,7 @@
 //-----------------CODE SETUP---------------------
 #define OLED_CONNECTED // comment if the OLED will not be attached to the device
 #define DEFAULT_THRESHOLD 100 //this is the threshold trigger value for a reading event
+float calibration_factor = 1.0; // default factor
 // BLE Server
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -84,9 +85,6 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-// Loadcell
-#define CALIBRATION_FACTOR 1.0
-
 //--------------------GLOBAL VARIABLES-----------------
 // DATA FILES
 char file_name_path[31] = "/weight_readings_test.txt";
@@ -111,6 +109,7 @@ char calibration_weights [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of calibrat
   { "110" },
   { "150" }
  };
+float calibration_weight_values [NUM_POINTS];
 bool calibrate_complete_flag = false;
 float reading_threshold;
 
@@ -225,7 +224,6 @@ void updateFilePath(fs::FS &fs, DateTime now){
   Serial.println("Calibration values file path: " + String(calibrate_file_name_path));
   logMessage(SD, "SD: Updated data and calibration file paths",INFO_LEVEL);
   
-    
   // Check if the file already exists so that it is not overwritten
   File file = fs.open(file_name_path, FILE_APPEND);
   if(!file){
@@ -304,7 +302,7 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
 };
 #endif
 
-void getCalibratePoints(String calibration_weight) {
+void getCalibrationPoints(String calibration_weight, int calibration_point) {
   #ifdef OLED_CONNECTED
     writeToDisplayCentre(2, WHITE, "Calibrating...");
   #endif
@@ -315,8 +313,11 @@ void getCalibratePoints(String calibration_weight) {
   // LoadCell.update();
   // LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
   LoadCell.update();
-  float calibration_value = LoadCell.getData();
+  calibration_weight_values[calibration_point] = LoadCell.getData();
+  float calibration_value = calibration_weight_values[calibration_point];
+  Serial.println(calibration_point);
   Serial.println(calibration_value);
+
   if(!calibration_weight.equals(calibration_weights[0])){ 
     sprintf(calibrate_data_msg, "%s,%s,%.2f", calibrate_data_msg, calibration_weight, calibration_value); 
   }
@@ -338,6 +339,15 @@ void getCalibratePoints(String calibration_weight) {
   Serial.println("Stored calibration value for " + String(calibration_weight) + "g");
   Serial.println("***");
 };
+
+float getCalibrationFactor() {
+  Serial.println(calibration_weight_values[NUM_POINTS-1]);
+  Serial.println(calibration_weight_values[1]);
+  Serial.println(calibration_weights[NUM_POINTS-1]);
+  Serial.println(calibration_weights[1]);
+  Serial.println("Calibrate mode: calculating new calibration factor.");
+  return (calibration_weight_values[NUM_POINTS-1]-calibration_weight_values[1])/(atoi(calibration_weights[NUM_POINTS-1])-atoi(calibration_weights[1]));
+}
 
 void controllerRead(){
   //*********** CONTROLLER Read
@@ -448,21 +458,27 @@ void controllerCalibrate(){
       calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
       calibrate_complete_flag = false;
     }else if(calibrateVal == "save"){
-      Serial.println("Calibrate mode: Saving Calibration point values");
+      // Get calibration factor
+      calibration_factor = getCalibrationFactor();
+      LoadCell.setCalFactor(calibration_factor); // reset the calibration factor.
+      Serial.println("Loadcell: set new calibration factor as " + String(calibration_factor));
 
-      sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
-      Serial.println(strlen(calibrate_data_msg));
+      // Save the calibration points and the calibration factor
+      sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d, %f\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(),calibration_factor); 
+      // Serial.println(calibrate_data_msg);
+
       // Save to text file on SD card
+      Serial.println("Calibrate mode: saving calibration points and factor to file."); 
       appendFile(SD, calibrate_file_name_path, calibrate_data_msg);
       appendFile(SD, file_name_path, calibrate_data_msg);
       strcpy(calibrate_data_msg, "");
-      //memset(data_msg, 0, MSG_BUFFER_SIZE);
-      Serial.println("Calibrate mode: Written to file.");
+
+      Serial.println("Calibrate mode: calibration points and factor written to file.");
 
       #ifdef OLED_CONNECTED
         writeToDisplayCentre(3, WHITE, "Written to file.");
       #endif
-      
+
       // Set 'ok' for succesfully saving calibration value
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       Serial.println("Calibrate mode: Wrote ok to characteristic");
@@ -476,12 +492,12 @@ void controllerCalibrate(){
       }
     }else{
       // Run calibration
-      for (int i = 0; i < NUM_POINTS; i++){
-        if (calibrateVal.equals(calibration_weights[i])) {
+      for (int calibration_point = 0; calibration_point < NUM_POINTS; calibration_point++){
+        if (calibrateVal.equals(calibration_weights[calibration_point])) {
           Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
         
           if(!calibrate_complete_flag){
-            getCalibratePoints(calibrateVal);
+            getCalibrationPoints(calibrateVal,calibration_point);
             calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
           }
         }
@@ -615,10 +631,11 @@ void setup() {
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
   } else {
-    LoadCell.setCalFactor(CALIBRATION_FACTOR);
+    LoadCell.setCalFactor(calibration_factor); // originally set to a default value and then updated later.
+    Serial.println("Loadcell: calibration factor set.");
   //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
-  //   Serial.println("Startup is complete");
   }
+  Serial.println("Loadcell: Startup is complete");
   
   // Set the threshold value for taking readings based on the last value saved in EEPROM
   EEPROM.begin(512);
