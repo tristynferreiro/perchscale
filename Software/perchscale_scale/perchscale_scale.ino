@@ -115,6 +115,7 @@ float reading_threshold;
 
 // EEPROM address
 const int calVal_eepromAdress = 0;
+// const int threshhold_eepromAdress = 1;
 
 // OLED
 #ifdef OLED_CONNECTED
@@ -302,21 +303,17 @@ void writeToDisplayCentre(int textSize, char textColour, const char* text) {
 };
 #endif
 
-void getCalibrationPoints(String calibration_weight, int calibration_point) {
+void getCalibrationPoints(String calibration_weight, int calibration_point_index) {
   #ifdef OLED_CONNECTED
     writeToDisplayCentre(2, WHITE, "Calibrating...");
   #endif
 
   Serial.println("***");
   Serial.println("Starting calibration for "+ calibration_weight + "g");
-  
-  // LoadCell.update();
-  // LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
+
   LoadCell.update();
-  calibration_weight_values[calibration_point] = LoadCell.getData();
-  float calibration_value = calibration_weight_values[calibration_point];
-  Serial.println(calibration_point);
-  Serial.println(calibration_value);
+  calibration_weight_values[calibration_point_index] = LoadCell.getData();
+  float calibration_value = calibration_weight_values[calibration_point_index];
 
   if(!calibration_weight.equals(calibration_weights[0])){ 
     sprintf(calibrate_data_msg, "%s,%s,%.2f", calibrate_data_msg, calibration_weight, calibration_value); 
@@ -324,14 +321,14 @@ void getCalibrationPoints(String calibration_weight, int calibration_point) {
   else {
     sprintf(calibrate_data_msg, "%s,%.2f", calibration_weight, calibration_value); 
     
-    // Update the reading threshold value based on the lowest calibration value
-    reading_threshold = calibration_value; 
-    #if defined(ESP32)
-      EEPROM.begin(512);
-      EEPROM.put(calVal_eepromAdress, reading_threshold);
-      EEPROM.commit();
-      Serial.println("Threshold value is "+ String(EEPROM.get(calVal_eepromAdress, reading_threshold)));
-    #endif
+    // // Update the reading threshold value based on the lowest calibration value
+    // reading_threshold = calibration_value; 
+    // #if defined(ESP32)
+    //   EEPROM.begin(512);
+    //   EEPROM.put(threshhold_eepromAdress, reading_threshold);
+    //   EEPROM.commit();
+    //   Serial.println("Threshold value is "+ String(EEPROM.get(threshhold_eepromAdress, reading_threshold)));
+    // #endif
   }
 
   calibrate_complete_flag = true;
@@ -341,12 +338,99 @@ void getCalibrationPoints(String calibration_weight, int calibration_point) {
 };
 
 float getCalibrationFactor() {
+  Serial.println("Calibrate mode: calculating new calibration factor.");
   Serial.println(calibration_weight_values[NUM_POINTS-1]);
   Serial.println(calibration_weight_values[1]);
   Serial.println(calibration_weights[NUM_POINTS-1]);
   Serial.println(calibration_weights[1]);
-  Serial.println("Calibrate mode: calculating new calibration factor.");
-  return (calibration_weight_values[NUM_POINTS-1]-calibration_weight_values[1])/(atoi(calibration_weights[NUM_POINTS-1])-atoi(calibration_weights[1]));
+  
+  float factor = (calibration_weight_values[NUM_POINTS-1]-calibration_weight_values[1])/(atoi(calibration_weights[NUM_POINTS-1])-atoi(calibration_weights[1]));
+
+  #if defined(ESP32)
+    EEPROM.begin(512);
+    EEPROM.put(calVal_eepromAdress, factor);
+    EEPROM.commit();
+    Serial.println("Calibration factor is "+ String(EEPROM.get(calVal_eepromAdress, factor)));
+  #endif
+  
+  return factor;
+
+}
+
+float getReadingThreshold(float calibration_factor){
+    return 100/(calibration_factor);
+}
+
+void controllerCalibrate(){
+  String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
+
+    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
+      Serial.println("Calibrate mode: Unacceptable calibrate value received.");
+      logMessage(SD, ("Calibrate mode: Unacceptable calibrate value received, "+ calibrateVal).c_str(),ERROR_LEVEL);
+      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
+    }
+
+    if (calibrateVal == rstMSG) {
+      Serial.println("Calibrate mode: Resetting calibrate flag.");
+      calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
+      calibrate_complete_flag = false;
+    }else if(calibrateVal == "save"){
+      // Get calibration factor
+      calibration_factor = getCalibrationFactor();
+      LoadCell.setCalFactor(calibration_factor); // reset the calibration factor.
+      Serial.println("Loadcell: set new calibration factor as " + String(calibration_factor));
+
+      // Update the reading threshold
+      reading_threshold = getReadingThreshold(calibration_factor);
+      Serial.println("Loadcell: set new reading threshold as " + String(reading_threshold));
+
+      // Save the calibration points and the calibration factor
+      sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d, %f\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(),calibration_factor); 
+      // Serial.println(calibrate_data_msg);
+
+      // Save to text file on SD card
+      Serial.println("Calibrate mode: saving calibration points and factor to file."); 
+      appendFile(SD, calibrate_file_name_path, calibrate_data_msg);
+      appendFile(SD, file_name_path, calibrate_data_msg);
+      strcpy(calibrate_data_msg, "");
+
+      Serial.println("Calibrate mode: calibration points and factor written to file.");
+
+      #ifdef OLED_CONNECTED
+        writeToDisplayCentre(3, WHITE, "Written to file.");
+      #endif
+
+      // Set 'ok' for succesfully saving calibration value
+      calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      Serial.println("Calibrate mode: Wrote ok to characteristic");
+    }
+    else if(calibrateVal == "done") {
+      Serial.println("Calibrate mode: Calibrate DONE command received");
+      if(!calibrate_complete_flag){
+        Serial.println("Calibrate mode: Setting flag to ok");
+        logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
+        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+      }
+    }else{
+      // Run calibration
+      // Reset the calibration value to 1 to get raw data
+      LoadCell.setCalFactor(1.00);
+
+      // Get the new data
+      LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
+
+      for (int calibration_point_index = 0; calibration_point_index < NUM_POINTS; calibration_point_index++){
+        if (calibrateVal.equals(calibration_weights[calibration_point_index])) {
+          Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
+        
+          if(!calibrate_complete_flag){
+            getCalibrationPoints(calibrateVal,calibration_point_index);
+            calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
+          }
+        }
+      }
+    }
+    delay(100);
 }
 
 void controllerRead(){
@@ -365,7 +449,8 @@ void controllerRead(){
       if (LoadCell.update()) newDataReady = true;
       if (newDataReady) {
           float reading = LoadCell.getData();
-          if(reading<reading_threshold){
+          Serial.println(String(reading) + String(", raw: ") +String(reading*calibration_factor));
+          if((reading<reading_threshold && reading_threshold>0) || (reading>reading_threshold && reading_threshold<0)){
             readCharacteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
             reading_number = 1; // RESET readings counter between events
             if(eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
@@ -395,7 +480,7 @@ void controllerRead(){
               }
             }
           }
-          else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
+          else{ //If a bird or heavy object is detected on the scale
               
               logData(SD,"c","read",reading);
 
@@ -444,67 +529,7 @@ void controllerTare(){
       status = "connected"; // OLED reset the status
     }
 }
-void controllerCalibrate(){
-  String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
-    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
-      Serial.println("Calibrate mode: Unacceptable calibrate value received.");
-      logMessage(SD, ("Calibrate mode: Unacceptable calibrate value received, "+ calibrateVal).c_str(),ERROR_LEVEL);
-      calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
-    }
-
-    if (calibrateVal == rstMSG) {
-      Serial.println("Calibrate mode: Resetting calibrate flag.");
-      calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
-      calibrate_complete_flag = false;
-    }else if(calibrateVal == "save"){
-      // Get calibration factor
-      calibration_factor = getCalibrationFactor();
-      LoadCell.setCalFactor(calibration_factor); // reset the calibration factor.
-      Serial.println("Loadcell: set new calibration factor as " + String(calibration_factor));
-
-      // Save the calibration points and the calibration factor
-      sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d, %f\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(),calibration_factor); 
-      // Serial.println(calibrate_data_msg);
-
-      // Save to text file on SD card
-      Serial.println("Calibrate mode: saving calibration points and factor to file."); 
-      appendFile(SD, calibrate_file_name_path, calibrate_data_msg);
-      appendFile(SD, file_name_path, calibrate_data_msg);
-      strcpy(calibrate_data_msg, "");
-
-      Serial.println("Calibrate mode: calibration points and factor written to file.");
-
-      #ifdef OLED_CONNECTED
-        writeToDisplayCentre(3, WHITE, "Written to file.");
-      #endif
-
-      // Set 'ok' for succesfully saving calibration value
-      calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      Serial.println("Calibrate mode: Wrote ok to characteristic");
-    }
-    else if(calibrateVal == "done") {
-      Serial.println("Calibrate mode: Calibrate DONE command received");
-      if(!calibrate_complete_flag){
-        Serial.println("Calibrate mode: Setting flag to ok");
-        logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
-        calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-      }
-    }else{
-      // Run calibration
-      for (int calibration_point = 0; calibration_point < NUM_POINTS; calibration_point++){
-        if (calibrateVal.equals(calibration_weights[calibration_point])) {
-          Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
-        
-          if(!calibrate_complete_flag){
-            getCalibrationPoints(calibrateVal,calibration_point);
-            calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
-          }
-        }
-      }
-    }
-    delay(100);
-}
 
 void logData(fs::FS &fs, String mode, String type, float reading){ 
   char msg[100];
@@ -555,6 +580,7 @@ void logData(fs::FS &fs, String mode, String type, float reading){
     data_num_readings++;
   }
 };
+
 
 //*******************************************************************************************************************************
 //
@@ -631,15 +657,18 @@ void setup() {
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
   } else {
+    EEPROM.begin(512);
+    EEPROM.get(calVal_eepromAdress, calibration_factor);
     LoadCell.setCalFactor(calibration_factor); // originally set to a default value and then updated later.
-    Serial.println("Loadcell: calibration factor set.");
+    Serial.println(String("Loadcell: calibration factor set to ") + String(calibration_factor));
   //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
   }
   Serial.println("Loadcell: Startup is complete");
   
   // Set the threshold value for taking readings based on the last value saved in EEPROM
-  EEPROM.begin(512);
-  EEPROM.get(calVal_eepromAdress, reading_threshold);
+  // EEPROM.begin(512);
+  // EEPROM.get(threshhold_eepromAdress, reading_threshold);
+  reading_threshold = getReadingThreshold(calibration_factor);
   if(isnan(reading_threshold)){
     reading_threshold = DEFAULT_THRESHOLD; // ADJUST ACCORDING TO WHAT MAKES SENSE
   }
@@ -744,7 +773,8 @@ void loop() {
     if (LoadCell.update()) newDataReady = true;
     if (newDataReady) {
         float reading = LoadCell.getData();
-        if(reading<reading_threshold){
+        Serial.println(reading);
+        if((reading<reading_threshold && reading_threshold>0) || (reading>reading_threshold && reading_threshold<0)){
           #ifdef OLED_CONNECTED
             writeToDisplayCentre(2.5, WHITE, "No bird");
           #endif
@@ -772,7 +802,7 @@ void loop() {
             }
           }
         }
-        else if (reading>reading_threshold){ //If a bird or heavy object is detected on the scale
+        else{ //If a bird or heavy object is detected on the scale
             String reading_data_msg = String(reading);// + "g";
             #ifdef OLED_CONNECTED
               writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
