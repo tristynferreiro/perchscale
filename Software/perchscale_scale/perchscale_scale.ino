@@ -97,14 +97,14 @@ const int HX711_sck = 33; // D33 mcu > HX711 sck pin
 HX711_ADC LoadCell(HX711_dout, HX711_sck); // instantiate an HX711 object
 
 // Calibration
-const int NUM_POINTS = 7; // number of items in the list
+const int NUM_POINTS = 3; // number of items in the list
 const int MAX_ITEM_LENGTH = 4; // maximum characters for the item name
 
 char calibration_weights [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of calibration weights used (in grams)
-  { "50" }, 
-  { "60" }, 
-  { "70" },
-  { "90" },
+  // { "50" }, 
+  // { "60" }, 
+  // { "70" },
+  // { "90" },
   { "100" },
   { "110" },
   { "150" }
