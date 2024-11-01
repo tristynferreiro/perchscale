@@ -136,6 +136,7 @@ char msg[100]; // this is a temporary variable used in some places when string f
 
 int data_num_readings = 1; // how many readings added to message counter
 int reading_number = 1; // scale readings counter
+boolean newDataReady = 0;
 // BLE Server
 bool deviceConnected = false;
 int value = 0;
@@ -444,7 +445,6 @@ void controllerRead(){
       status = "connected"; // OLED reset the status
     } 
     else if (readVal != "read" && readVal != rstMSG) {
-      static boolean newDataReady = 0;
       // check for new data/start next conversion:
       if (LoadCell.update()) newDataReady = true;
       if (newDataReady) {
@@ -455,16 +455,17 @@ void controllerRead(){
             reading_number = 1; // RESET readings counter between events
             if(eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
             
-              boolean _resume = false;
-              boolean _tarewait = true;
+              // boolean _resume = false;
+              // boolean _tarewait = true;
 
-              while (_resume == false) {
+              // while (_resume == false) {
                 LoadCell.update();
-                if(_tarewait){              
-                  LoadCell.tareNoDelay();
-                  _tarewait = false;
-                }
-                if (LoadCell.getTareStatus() == true) {
+                LoadCell.tare();
+                // if(_tarewait){              
+                  // LoadCell.tareNoDelay();
+                  // _tarewait = false;
+                // }
+                // if (LoadCell.getTareStatus() == true) {
                   readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
                   #ifdef OLED_CONNECTED
                   writeToDisplayCentre(2.5, WHITE, "Tare done");
@@ -474,11 +475,11 @@ void controllerRead(){
                   
                   logData(SD, "c","tare",0);
                   
-                  _resume = true;
+                  // _resume = true;
                   // delay(2000);
-                }
+                // }
               }
-            }
+            // }
           }
           else{ //If a bird or heavy object is detected on the scale
               
@@ -511,7 +512,8 @@ void controllerTare(){
     if (tareVal == "t") {
       status = "tare"; // OLED set the status
       Serial.println("Tare mode: Tare command received");
-      LoadCell.tareNoDelay(); //tare
+      LoadCell.update();
+      LoadCell.tare(); //tare
       
       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Tare done");
@@ -769,7 +771,7 @@ void loop() {
   // If no controller is connected, read values and save to SD card (no OLED)
   else if(!deviceConnected){
     // check for new data/start next conversion:
-    static boolean newDataReady = 0;
+    //static boolean newDataReady = 0;
     if (LoadCell.update()) newDataReady = true;
     if (newDataReady) {
         float reading = LoadCell.getData();
@@ -780,15 +782,16 @@ void loop() {
           #endif
           reading_number = 1;
           if(eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
-            boolean _resume = false;
-            boolean _tarewait = true;
-            while (_resume == false) {
+            // boolean _resume = false;
+            // boolean _tarewait = true;
+            // while (_resume == false) {
               LoadCell.update();
-              if(_tarewait){              
-                LoadCell.tareNoDelay();
-                _tarewait = false;
-              }
-              if (LoadCell.getTareStatus() == true) {
+              LoadCell.tare();
+              // if(_tarewait){              
+              //   LoadCell.tareNoDelay();
+              //   _tarewait = false;
+              // }
+              // if (LoadCell.getTareStatus() == true) {
                 #ifdef OLED_CONNECTED
                   writeToDisplayCentre(2.5, WHITE, "Tare done");
                 #endif
@@ -796,10 +799,10 @@ void loop() {
                 logData(SD, "s", "tare",0);
 
                 Serial.println("Next Tare Complete");
-                _resume = true;
+                // _resume = true;
                 delay(2000);
-              }
-            }
+              // }
+            // }
           }
         }
         else{ //If a bird or heavy object is detected on the scale
@@ -825,7 +828,7 @@ void loop() {
 
       logData(SD, "s", "tare",0);
        
-      Serial.println("Tare complete");
+      Serial.println("Tare complete. IDK what this does");
     }
   } // End of case where device is not connected
   
