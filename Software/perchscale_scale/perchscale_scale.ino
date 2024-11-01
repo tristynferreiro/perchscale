@@ -313,14 +313,18 @@ void getCalibrationPoints(String calibration_weight, int calibration_point_index
   Serial.println("Starting calibration for "+ calibration_weight + "g");
 
   LoadCell.update();
-  calibration_weight_values[calibration_point_index] = LoadCell.getData();
-  float calibration_value = calibration_weight_values[calibration_point_index];
+  float tempy;
+  uint8_t average = 1;
+  for (uint8_t i = 0;i<average;i++) {
+    tempy += LoadCell.getData()/average;
+  }
+  calibration_weight_values[calibration_point_index] = tempy;
 
   if(!calibration_weight.equals(calibration_weights[0])){ 
-    sprintf(calibrate_data_msg, "%s,%s,%.2f", calibrate_data_msg, calibration_weight, calibration_value); 
+    sprintf(calibrate_data_msg, "%s,%s,%.2f", calibrate_data_msg, calibration_weight, calibration_weight_values[calibration_point_index]); 
   }
   else {
-    sprintf(calibrate_data_msg, "%s,%.2f", calibration_weight, calibration_value); 
+    sprintf(calibrate_data_msg, "%s,%.2f", calibration_weight, calibration_weight_values[calibration_point_index]); 
     
     // // Update the reading threshold value based on the lowest calibration value
     // reading_threshold = calibration_value; 
@@ -359,23 +363,23 @@ float getCalibrationFactor() {
 }
 
 float getReadingThreshold(float calibration_factor){
-    return 100/(calibration_factor);
+    return 100/(1/calibration_factor);
 }
 
 void controllerCalibrate(){
-  String calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
+  String ble_calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
-    if (calibrateVal != okMSG && calibrateVal != rstMSG && !calibrateVal.equals(calibration_weights[0]) && !calibrateVal.equals(calibration_weights[1]) && !calibrateVal.equals(calibration_weights[2]) && !calibrateVal.equals(calibration_weights[3]) && !calibrateVal.equals(calibration_weights[4]) && !calibrateVal.equals(calibration_weights[5]) && !calibrateVal.equals(calibration_weights[6]) && calibrateVal != "calibrate" && calibrateVal != "done" && calibrateVal!= "save") {
+    if (ble_calibrateVal != okMSG && ble_calibrateVal != rstMSG && !ble_calibrateVal.equals(calibration_weights[0]) && !ble_calibrateVal.equals(calibration_weights[1]) && !ble_calibrateVal.equals(calibration_weights[2]) && !ble_calibrateVal.equals(calibration_weights[3]) && !ble_calibrateVal.equals(calibration_weights[4]) && !ble_calibrateVal.equals(calibration_weights[5]) && !ble_calibrateVal.equals(calibration_weights[6]) && ble_calibrateVal != "calibrate" && ble_calibrateVal != "done" && ble_calibrateVal!= "save") {
       Serial.println("Calibrate mode: Unacceptable calibrate value received.");
-      logMessage(SD, ("Calibrate mode: Unacceptable calibrate value received, "+ calibrateVal).c_str(),ERROR_LEVEL);
+      logMessage(SD, ("Calibrate mode: Unacceptable calibrate value received, "+ ble_calibrateVal).c_str(),ERROR_LEVEL);
       calibrateCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     }
 
-    if (calibrateVal == rstMSG) {
+    if (ble_calibrateVal == rstMSG) {
       Serial.println("Calibrate mode: Resetting calibrate flag.");
       calibrateCharacteristic->setValue("calibrate"); // BLE: set characteristic
       calibrate_complete_flag = false;
-    }else if(calibrateVal == "save"){
+    }else if(ble_calibrateVal == "save"){
       // Get calibration factor
       calibration_factor = getCalibrationFactor();
       LoadCell.setCalFactor(calibration_factor); // reset the calibration factor.
@@ -405,7 +409,7 @@ void controllerCalibrate(){
       calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
       Serial.println("Calibrate mode: Wrote ok to characteristic");
     }
-    else if(calibrateVal == "done") {
+    else if(ble_calibrateVal == "done") {
       Serial.println("Calibrate mode: Calibrate DONE command received");
       if(!calibrate_complete_flag){
         Serial.println("Calibrate mode: Setting flag to ok");
@@ -421,11 +425,11 @@ void controllerCalibrate(){
       LoadCell.refreshDataSet(); //refresh the dataset to be sure that the mass is measured correctly
 
       for (int calibration_point_index = 0; calibration_point_index < NUM_POINTS; calibration_point_index++){
-        if (calibrateVal.equals(calibration_weights[calibration_point_index])) {
-          Serial.println(String("Calibrate mode: Calibrate ")+ calibrateVal + String("g command received"));
+        if (ble_calibrateVal.equals(calibration_weights[calibration_point_index])) {
+          Serial.println(String("Calibrate mode: Calibrate ")+ ble_calibrateVal + String("g command received"));
         
           if(!calibrate_complete_flag){
-            getCalibrationPoints(calibrateVal,calibration_point_index);
+            getCalibrationPoints(ble_calibrateVal,calibration_point_index);
             calibrateCharacteristic->setValue(okMSG.c_str()); // BLE: set characteristic
           }
         }
@@ -449,7 +453,7 @@ void controllerRead(){
       if (LoadCell.update()) newDataReady = true;
       if (newDataReady) {
           float reading = LoadCell.getData();
-          Serial.println(String(reading) + String(", raw: ") +String(reading*calibration_factor));
+          Serial.println(String(reading*(1/calibration_factor)) + String(", raw: ") +String(reading));
           if((reading<reading_threshold && reading_threshold>0) || (reading>reading_threshold && reading_threshold<0)){
             readCharacteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
             reading_number = 1; // RESET readings counter between events
@@ -661,6 +665,9 @@ void setup() {
   } else {
     EEPROM.begin(512);
     EEPROM.get(calVal_eepromAdress, calibration_factor);
+    if(isnan(calibration_factor)) {
+      calibration_factor = 1;
+    }
     LoadCell.setCalFactor(calibration_factor); // originally set to a default value and then updated later.
     Serial.println(String("Loadcell: calibration factor set to ") + String(calibration_factor));
   //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
@@ -776,7 +783,18 @@ void loop() {
     if (newDataReady) {
         float reading = LoadCell.getData();
         Serial.println(reading);
-        if((reading<reading_threshold && reading_threshold>0) || (reading>reading_threshold && reading_threshold<0)){
+        if((reading>reading_threshold)){ // If bird is on the scale
+           String reading_data_msg = String(reading);// + "g";
+            #ifdef OLED_CONNECTED
+              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
+            #endif
+
+            // Serial.println(reading_data_msg);
+            logData(SD, "s", "read", reading);
+
+            newDataReady = 0;     
+        }     
+        else{
           #ifdef OLED_CONNECTED
             writeToDisplayCentre(2.5, WHITE, "No bird");
           #endif
@@ -805,18 +823,6 @@ void loop() {
             // }
           }
         }
-        else{ //If a bird or heavy object is detected on the scale
-            String reading_data_msg = String(reading);// + "g";
-            #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
-            #endif
-
-            // Serial.println(reading_data_msg);
-            logData(SD, "s", "read", reading);
-
-            newDataReady = 0;
-        }
-      
     }
 
     // check if last tare operation is complete
