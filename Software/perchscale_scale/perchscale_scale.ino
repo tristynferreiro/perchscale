@@ -31,7 +31,7 @@
 
 //-----------------CODE SETUP---------------------
 #define OLED_CONNECTED // comment if the OLED will not be attached to the device
-#define DEFAULT_THRESHOLD 100 //this is the threshold trigger value for a reading event
+#define READING_THRESHOLD 100 // [in g] this is the reading event threshold 
 float calibration_factor = 1.0; // default factor
 // BLE Server
 // See the following for generating UUIDs:
@@ -93,6 +93,7 @@ char calibrate_file_name_path[31] = "/calibrate_values_test.txt";
 // SCALE
 const int HX711_dout = 32; // D32 mcu > HX711 dout pin 
 const int HX711_sck = 33; // D33 mcu > HX711 sck pin
+float reading;
 
 HX711_ADC LoadCell(HX711_dout, HX711_sck); // instantiate an HX711 object
 
@@ -134,8 +135,8 @@ char calibrate_data_msg[1000];
 char log_buffer[LOG_BUFFER_SIZE];
 char msg[100]; // this is a temporary variable used in some places when string formatting is needed.
 
-int data_num_readings = 1; // how many readings added to message counter
-int reading_number = 1; // scale readings counter
+int data_num_readings = 1; // how many readings added to message before it is saved to the SD card.
+int reading_number = 1; // this is the number of readings in a reading event
 boolean newDataReady = 0;
 // BLE Server
 bool deviceConnected = false;
@@ -362,10 +363,6 @@ float getCalibrationFactor() {
 
 }
 
-float getReadingThreshold(float calibration_factor){
-    return 100/(1/calibration_factor);
-}
-
 void controllerCalibrate(){
   String ble_calibrateVal = calibrateCharacteristic->getValue().c_str(); // BLE: read characteristic
 
@@ -384,10 +381,6 @@ void controllerCalibrate(){
       calibration_factor = getCalibrationFactor();
       LoadCell.setCalFactor(calibration_factor); // reset the calibration factor.
       Serial.println("Loadcell: set new calibration factor as " + String(calibration_factor));
-
-      // Update the reading threshold
-      reading_threshold = getReadingThreshold(calibration_factor);
-      Serial.println("Loadcell: set new reading threshold as " + String(reading_threshold));
 
       // Save the calibration points and the calibration factor
       sprintf(calibrate_data_msg, "%s, %02d:%02d:%02d %02d/%02d/%02d, %f\n", calibrate_data_msg, now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year(),calibration_factor); 
@@ -438,82 +431,86 @@ void controllerCalibrate(){
     delay(100);
 }
 
+void read(bool controller_mode){
+  /*
+  * This function is the main operation of the scale. Here the HX711 is polled and when it returns a value (reading), if that value is greater than the bird threshold, it is saved to the text file, otherwise the reading is ignored and periodically the scale is tared.
+  * bool controller_mode is used to ensure that the BLE characteristics are set
+  */
+
+  // check for new data/start next conversion:
+  if (LoadCell.update()) newDataReady = true;
+    
+  if (newDataReady) {
+    reading = LoadCell.getData();
+
+    Serial.println("Test print (THIS IS NOT ACTUALLY CONSIDERED A READ YET): " + String(reading)); // Temporary print
+      
+    if((reading>reading_threshold)){ // If bird is on the scale
+      String reading_data_msg = String(reading) + "g";
+        
+      #ifdef OLED_CONNECTED
+        writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
+      #endif
+
+      Serial.println("This is considered a reading: " + reading_data_msg);
+      logData(SD, "s", "read", reading);
+
+      newDataReady = 0;  
+
+      if(controller_mode) readCharacteristic->setValue(String(reading_data_msg).c_str()); // BLE: Updating value to scale reading  
+        
+      }     
+      else{ // If there is no bird
+        #ifdef OLED_CONNECTED
+          writeToDisplayCentre(2.5, WHITE, "No bird");
+        #endif
+
+         if(controller_mode)readCharacteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
+        
+        reading_number = 1; // reset the number of readings in the current reading event
+
+        if(eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
+          LoadCell.update();
+          LoadCell.tare();
+          #ifdef OLED_CONNECTED
+            writeToDisplayCentre(2.5, WHITE, "Tare done");
+          #endif
+          
+          if(controller_mode)readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value
+
+          logData(SD, "s", "tare",0);
+
+          Serial.println("Next Tare Complete");
+        
+        }
+      }
+    }
+}
+
 void controllerRead(){
   //*********** CONTROLLER Read
-    String readVal = readCharacteristic->getValue().c_str(); // BLE: read characteristic
-    // Serial.print("Read:"); Serial.println(readVal);
-
-    if (readVal == rstMSG) {
-      Serial.println("Read mode: Resetting read flag.");
-      readCharacteristic->setValue("read"); // BLE: set characteristic
-      status = "connected"; // OLED reset the status
-    } 
-    else if (readVal != "read" && readVal != rstMSG) {
-      // check for new data/start next conversion:
-      if (LoadCell.update()) newDataReady = true;
-      if (newDataReady) {
-          float reading = LoadCell.getData();
-          Serial.println(String(reading*(1/calibration_factor)) + String(", raw: ") +String(reading));
-          if((reading<reading_threshold && reading_threshold>0) || (reading>reading_threshold && reading_threshold<0)){
-            readCharacteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
-            reading_number = 1; // RESET readings counter between events
-            if(eigthseconds%80 == 0){ //Condition to set new tare every 1000 milliseconds
-            
-              // boolean _resume = false;
-              // boolean _tarewait = true;
-
-              // while (_resume == false) {
-                LoadCell.update();
-                LoadCell.tare();
-                // if(_tarewait){              
-                  // LoadCell.tareNoDelay();
-                  // _tarewait = false;
-                // }
-                // if (LoadCell.getTareStatus() == true) {
-                  readCharacteristic->setValue(String("Tared").c_str()); // BLE: Updating value (placeholder)
-                  #ifdef OLED_CONNECTED
-                  writeToDisplayCentre(2.5, WHITE, "Tare done");
-                  #endif
-
-                  Serial.println("Read mode: Next Tare Complete");
-                  
-                  logData(SD, "c","tare",0);
-                  
-                  // _resume = true;
-                  // delay(2000);
-                // }
-              }
-            // }
-          }
-          else{ //If a bird or heavy object is detected on the scale
-              
-              logData(SD,"c","read",reading);
-
-              String reading_data_msg = String(reading) + "g";
-               #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
-              #endif
-
-              readCharacteristic->setValue(String(reading_data_msg).c_str()); // BLE: Updating value to scale reading
-
-              newDataReady = 0;
-              reading_number++;
-              data_num_readings++;
-          }
-        
-      }
-      status="read";
-    } 
+  String ble_readVal = readCharacteristic->getValue().c_str(); // BLE: read characteristic
+  // Serial.print("Read:"); Serial.println(ble_readVal);
+  
+  if (ble_readVal == rstMSG) {
+    Serial.println("Read mode: Resetting read flag.");
+    readCharacteristic->setValue("read"); // BLE: set characteristic
+    status = "connected"; // OLED reset the status
+  } 
+  else if (ble_readVal != "read" && ble_readVal != rstMSG) {
+    read(1);
+    status="read";
+  } 
 }
 void controllerTare(){
-  String tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
+  String ble_tareVal = tareCharacteristic->getValue().c_str(); // BLE: read characteristic
 
-    if (tareVal != okMSG && tareVal != rstMSG && tareVal != "t" && tareVal != "tare") {
+    if (ble_tareVal != okMSG && ble_tareVal != rstMSG && ble_tareVal != "t" && ble_tareVal != "tare") {
       Serial.println("Tare mode: Unacceptable tare value received.");
       logMessage(SD, "Tare mode: Unacceptable tare value received.", ERROR_LEVEL);
       tareCharacteristic->setValue(nokMSG.c_str()); // BLE: set characteristic
     } 
-    if (tareVal == "t") {
+    if (ble_tareVal == "t") {
       status = "tare"; // OLED set the status
       Serial.println("Tare mode: Tare command received");
       LoadCell.update();
@@ -528,7 +525,7 @@ void controllerTare(){
       tareCharacteristic->setValue(okMSG.c_str()); // BLE: send OK 
       Serial.println("Tare mode: Tare complete");
     } 
-    else if (tareVal == rstMSG) {
+    else if (ble_tareVal == rstMSG) {
       Serial.println("Tare mode: Resetting tare flag.");
       tareCharacteristic->setValue("tare"); // BLE: set characteristic
       logMessage(SD, "Tare mode: Tare complete.", INFO_LEVEL);
@@ -673,16 +670,9 @@ void setup() {
   //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
   }
   Serial.println("Loadcell: Startup is complete");
-  
-  // Set the threshold value for taking readings based on the last value saved in EEPROM
-  // EEPROM.begin(512);
-  // EEPROM.get(threshhold_eepromAdress, reading_threshold);
-  reading_threshold = getReadingThreshold(calibration_factor);
-  if(isnan(reading_threshold)){
-    reading_threshold = DEFAULT_THRESHOLD; // ADJUST ACCORDING TO WHAT MAKES SENSE
-  }
-  Serial.println("\nReading threshold value is " + String(reading_threshold));
-  logMessage(SD, ("Reading threshold value is set to "+ String(reading_threshold)).c_str(), INFO_LEVEL);
+ 
+  Serial.println("\nReading threshold value is " + String(READING_THRESHOLD));
+  logMessage(SD, ("Reading threshold value is set to "+ String(READING_THRESHOLD)).c_str(), INFO_LEVEL);
   Serial.println("Loadcell startup is complete");
   logMessage(SD, "Loadcell: startup complete", INFO_LEVEL);
 
@@ -777,56 +767,11 @@ void loop() {
   //----------STANDBY MODE------------------------
   // If no controller is connected, read values and save to SD card (no OLED)
   else if(!deviceConnected){
-    // check for new data/start next conversion:
-    //static boolean newDataReady = 0;
-    if (LoadCell.update()) newDataReady = true;
-    if (newDataReady) {
-        float reading = LoadCell.getData();
-        Serial.println(reading);
-        if((reading>reading_threshold)){ // If bird is on the scale
-           String reading_data_msg = String(reading);// + "g";
-            #ifdef OLED_CONNECTED
-              writeToDisplayCentre(3, WHITE, reading_data_msg.c_str());
-            #endif
-
-            // Serial.println(reading_data_msg);
-            logData(SD, "s", "read", reading);
-
-            newDataReady = 0;     
-        }     
-        else{
-          #ifdef OLED_CONNECTED
-            writeToDisplayCentre(2.5, WHITE, "No bird");
-          #endif
-          reading_number = 1;
-          if(eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
-            // boolean _resume = false;
-            // boolean _tarewait = true;
-            // while (_resume == false) {
-              LoadCell.update();
-              LoadCell.tare();
-              // if(_tarewait){              
-              //   LoadCell.tareNoDelay();
-              //   _tarewait = false;
-              // }
-              // if (LoadCell.getTareStatus() == true) {
-                #ifdef OLED_CONNECTED
-                  writeToDisplayCentre(2.5, WHITE, "Tare done");
-                #endif
-
-                logData(SD, "s", "tare",0);
-
-                Serial.println("Next Tare Complete");
-                // _resume = true;
-                delay(2000);
-              // }
-            // }
-          }
-        }
-    }
+    read(0); // Just run the reading function
+  }
 
     // check if last tare operation is complete
-    if (LoadCell.getTareStatus() == true) {
+  if (LoadCell.getTareStatus() == true) {
 
       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Tare done");
@@ -835,10 +780,9 @@ void loop() {
       logData(SD, "s", "tare",0);
        
       Serial.println("Tare complete. IDK what this does");
-    }
-  } // End of case where device is not connected
-  
+  }
 }; // End of main loop
+  
 
 
 
