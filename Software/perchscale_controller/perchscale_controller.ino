@@ -116,7 +116,7 @@ char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Tare" },
   { "Calibrate" },
   { "Disconnect" },
-  { "Disable BLE "}
+  { "DisableBLE"}
  };
 
 int current_screen = 0; // screen number which the menu is on
@@ -142,16 +142,16 @@ int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights us
   // 60,
   // 70,
   // 90,
-  100,
-  110,
-  150
+  150,
+  240,
+  300
 };
 
 // ************* BLE CLIENT ******************************
 static String rstMsg = "rst";
 static String doneMsg = "done";
 static String saveMsg = "save";
-statis String disableMsg = "disable";
+static String disableMsg = "disable";
 // Connect service:
 BLEClient*  pClient;
 // The remote service we wish to connect to.
@@ -1445,7 +1445,7 @@ void loop() {
 
     //------------------------- DISABLE BLE -------------------------------   
     // Attempting to disable
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Disabling");
@@ -1467,7 +1467,7 @@ void loop() {
     }
 
     // Attempting to disable (Receive response)
-    else if ((current_screen == 10) && connected && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 2) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && connected && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 2) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Disabling");
@@ -1477,10 +1477,10 @@ void loop() {
       Serial.println("In disable screen"); // DEBUGGING CODE
       Serial.println("BLE: Attempting to disable BLE (read characteristic).");
 
-      std::string value = pRemoteCharacteristic->readValue();
+      String value = pRemoteCharacteristic->readValue();
 
       if(value == "nok"){
-          pRemoteCharacteristic->writeValue(rst.c_str(),rst.length()); // reset characteristic
+          pRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // reset characteristic
           Serial.println("BLE: Failed to disabled BLE.\nReceived a response.");
           current_screen == 10; process_screen == 4; // Go to failed screen
         }
@@ -1491,7 +1491,7 @@ void loop() {
     }
 
   // Succesfully disabled BLE screen
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 3) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 3) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Successfully");
@@ -1509,7 +1509,7 @@ void loop() {
     }    
 
   // Failed to disabled BLE screen
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 4) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 4) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Unable to");
