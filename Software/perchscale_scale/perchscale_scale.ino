@@ -98,15 +98,15 @@ float reading;
 HX711_ADC LoadCell(HX711_dout, HX711_sck); // instantiate an HX711 object
 
 // Calibration
-const int NUM_POINTS = 3; // number of items in the list
+const int NUM_POINTS = 5; // number of items in the list
 const int MAX_ITEM_LENGTH = 4; // maximum characters for the item name
 char known_calibration_masses [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of calibration weights used (in grams)
   // { "50" }, 
   // { "60" }, 
-  // { "70" },
-  // { "90" },
+  { "120" },
   { "150" },
-  { "240" },
+  { "200" },
+  { "250" },
   { "300" }
  };
 float calibration_weight_values [NUM_POINTS]; // used to determine the calibration factor
@@ -136,12 +136,15 @@ char msg[100]; // this is a temporary variable used in some places when string f
 int data_num_readings = 1; // how many readings added to message before it is saved to the SD card.
 int reading_number = 1; // this is the number of readings in a reading event
 boolean new_data_ready = 0;
+
 // BLE Server
 bool device_connected = false;
 int value = 0;
 static String ble_rst_msg = "rst";
 static String ble_ok_msg = "ok";
 static String ble_nok_msg = "nok";
+static String ble_disable_msg = "disable";
+BLECharacteristic *pCharacteristic; // connect characteristic; also used for disabling the BLE
 BLECharacteristic *read_characteristic;
 BLECharacteristic *tare_characteristic;
 BLECharacteristic *calibrate_characteristic;
@@ -281,6 +284,8 @@ void appendFile(fs::FS &fs,  const char * path, const char * message){
       logMessage(SD, strcat("SD: Failed to open file for appending, ", String(path).c_str()),ERROR_LEVEL);
       writeFile(fs, path, message); // create the file if it does not exist
       return;
+  }if(file.print(message)){
+    Serial.println("Appended to file.");
   }
   file.close();
 };
@@ -328,32 +333,32 @@ void read(bool controller_mode){
 
       if(controller_mode) read_characteristic->setValue(String(reading_data_msg).c_str()); // BLE: Updating value to scale reading  
         
-      }     
-      else{ // If there is no bird
+    }     
+    else{ // IF THERE IS NO BIRD
+      #ifdef OLED_CONNECTED
+        writeToDisplayCentre(2.5, WHITE, "No bird");
+      #endif
+
+      if(controller_mode)read_characteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
+        
+      reading_number = 1; // reset the number of readings in the current reading event
+
+      if(now.hour() != old_hour){ //Condition to trigger tare every hour
+        LoadCell.update();
+        LoadCell.tare();
         #ifdef OLED_CONNECTED
-          writeToDisplayCentre(2.5, WHITE, "No bird");
+          writeToDisplayCentre(2.5, WHITE, "Tare done");
         #endif
-
-         if(controller_mode)read_characteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
-        
-        reading_number = 1; // reset the number of readings in the current reading event
-
-        if(eigthseconds%160 == 0){ //Condition to set new tare every 1000 milliseconds
-          LoadCell.update();
-          LoadCell.tare();
-          #ifdef OLED_CONNECTED
-            writeToDisplayCentre(2.5, WHITE, "Tare done");
-          #endif
           
-          if(controller_mode)read_characteristic->setValue(String("Tared").c_str()); // BLE: Updating value
+        if(controller_mode)read_characteristic->setValue(String("Tared").c_str()); // BLE: Updating value
 
-          logData(SD, "s", "tare",0);
+        logData(SD, "s", "tare",0);
 
-          Serial.println("Next Tare Complete");
+        Serial.println("Next Tare Complete");
         
-        }
       }
     }
+  }
 }
 
 void controllerRead(){
@@ -392,13 +397,13 @@ void controllerTare(){
       LoadCell.update();
       LoadCell.tare(); //tare
       
+      tare_characteristic->setValue(ble_ok_msg.c_str()); // BLE: send OK 
       #ifdef OLED_CONNECTED
       writeToDisplayCentre(2.5, WHITE, "Tare done");
       #endif
       
       logData(SD, "c","tare",0);
-
-      tare_characteristic->setValue(ble_ok_msg.c_str()); // BLE: send OK 
+      
       Serial.println("Controller mode = tare: Tare complete");
     } 
     else if (ble_tareVal == ble_rst_msg) {
@@ -720,7 +725,7 @@ void setup() {
 
   //****** CONNECT SERVICE
   BLEService *pService = pServer->createService(SERVICE_UUID);
-  BLECharacteristic *pCharacteristic =
+  pCharacteristic =
     pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 
   pCharacteristic->setValue("connect");
@@ -770,6 +775,15 @@ void setup() {
 
 void loop() {
   if(device_connected){ 
+
+    String ble_connectVal = pCharacteristic->getValue().c_str(); // BLE: read 
+    if(ble_connectVal.equals(ble_disable_msg)){
+      BLEDevice::startAdvertising();
+      Serial.println("Stopped advertising");
+      delay(200);
+      BLEDevice::deinit(true);
+      Serial.println("De-initialised");
+    }
     //----------CONTROLLER MODE------------------------
     if(status == "connected"){
        #ifdef OLED_CONNECTED

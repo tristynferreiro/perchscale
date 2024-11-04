@@ -108,7 +108,7 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 
 // Menu variables
 
 const int NUM_ITEMS = 6; // number of items in the list
-const int MAX_ITEM_LENGTH = 11; // maximum characters for the item name
+const int MAX_ITEM_LENGTH = 12; // maximum characters for the item name
 
 char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Connect" }, 
@@ -116,7 +116,7 @@ char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Tare" },
   { "Calibrate" },
   { "Disconnect" },
-  { "DisableBLE"}
+  { "Disable BLE"}
  };
 
 int current_screen = 0; // screen number which the menu is on
@@ -136,14 +136,12 @@ int button_back_clicked = 0; // same as above
 
 // Calibration weights
 int calibrate_weight = 10;
-const int NUM_POINTS = 3; // number of items in the list
+const int NUM_POINTS = 5; // number of items in the list
 int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights used (in grams)
-  // 50,
-  // 60,
-  // 70,
-  // 90,
+  120,
   150,
-  240,
+  200,
+  250,
   300
 };
 
@@ -151,7 +149,7 @@ int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights us
 static String rstMsg = "rst";
 static String doneMsg = "done";
 static String saveMsg = "save";
-static String disableMsg = "disable";
+static String ble_disable_msg = "disable";
 // Connect service:
 BLEClient*  pClient;
 // The remote service we wish to connect to.
@@ -427,13 +425,13 @@ void loop() {
     current_screen = 4;}
     else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[2] && String(menu_items[item_selected])=="Calibrate") {
     process_screen = 0;
-    current_screen = 9;}
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[3] && String(menu_items[item_selected])=="Calibrate") {
-    // process_screen = 0;
-    // current_screen = 6;}
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[4] && String(menu_items[item_selected])=="Calibrate") {
-    // process_screen = 0;
-    // current_screen = 7;} 
+    current_screen = 5;}
+    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[3] && String(menu_items[item_selected])=="Calibrate") {
+    process_screen = 0;
+    current_screen = 6;}
+    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[4] && String(menu_items[item_selected])=="Calibrate") {
+    process_screen = 0;
+    current_screen = 9;} 
     // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[5] && String(menu_items[item_selected])=="Calibrate") {
     // process_screen = 0;
     // current_screen = 8;} 
@@ -461,9 +459,9 @@ void loop() {
     else if (current_screen == 8 && process_screen ==0 && String(menu_items[item_selected])=="Calibrate") {
       current_screen = 8;
       process_screen = 1;}
-    else if (current_screen == 0 && process_screen == 0 && String(menu_items[item_selected])=="Disable BLE") {
-      current_screen = 10;
-      process_screen = 1;}      
+    // else if (current_screen == 0 && process_screen == 0 && String(menu_items[item_selected])=="Disable BLE") {
+    //   current_screen = 10;
+    //   process_screen = 1;}      
     //else if (current_screen == 4 && process_screen ==1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 5;}
     //  else {current_screen = 0;} // qr codes screen --> menu items screen
   }
@@ -580,7 +578,7 @@ void loop() {
       } 
         
     }
-    else if ((current_screen == 1) && String(menu_items[item_selected])=="Read" && process_screen == 3) { // READ SCALE SUB-MENU SCREEN
+    else if ((current_screen == 1) && process_screen == 3) { // READ SCALE SUB-MENU SCREEN
       // Serial.println("In Read screen, process screen 3"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
@@ -598,13 +596,17 @@ void loop() {
     // Scale: Tare confirm
     else if ((current_screen == 1) && String(menu_items[item_selected])=="Tare" && process_screen == 0) { // TARE SCALE SUB-MENU SCREEN
       // Serial.println("In Tare screen"); // DEBUGGING CODE
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.print("Click enter to");
-      u8g2.setCursor(0, 30);
-      u8g2.println("begin taring");       
+      if (connected){
+        u8g2.setFont(u8g_font_7x14B);
+        u8g2.setCursor(0, 15);
+        u8g2.print("Click enter to");
+        u8g2.setCursor(0, 30);
+        u8g2.println("begin taring");      
+      }else{
+        current_screen == 1; process_screen = 3;
+      }
+       
     }
-
     // Scale: Taring
     else if ((current_screen == 2) && String(menu_items[item_selected])=="Tare" && process_screen == 0) { // TARE SCALE SUB-MENU SCREEN
       // Serial.println("In Tare screen 2, process screen 0"); // DEBUGGING CODE
@@ -620,8 +622,10 @@ void loop() {
         // Set the characteristic's value to be the array of bytes that is actually a string.
         tareRemoteCharacteristic->writeValue(newValue.c_str(),newValue.length());
         Serial.println("Tare: Updated tare characteristic."); // DEBUGGING CODE
-        process_screen = 1;
-      }   
+        current_screen == 2; process_screen = 1;
+      }else{
+        current_screen == 1; process_screen = 3;
+      } 
     }
     // WAIT for scale response
     else if ((current_screen == 2) && String(menu_items[item_selected])=="Tare" && process_screen == 1) { // TARE SCALE SUB-MENU SCREEN
@@ -633,26 +637,21 @@ void loop() {
       u8g2.print("Please wait");      
       //------------------------- WAIT FOR SCALE TARE CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
-      if(display_counter == DELAY_COUNTER){ // Delay
-        
+      if(display_counter == 2*DELAY_COUNTER){ // Delay
         if (connected) { // Read values from server
           String value = tareRemoteCharacteristic->readValue().c_str();
-          // Serial.println(value.c_str());
+          Serial.println(value.c_str());
           if(value == "ok"){
-            process_screen = 2;
-            Serial.println("Tare: Tare successful");
+            current_screen = 2; process_screen = 2;
           }else{
-            process_screen = 3;
-            Serial.println("Tare: FAILED to tare");
+            current_screen = 2; process_screen = 3;
           }
         }else{
-          process_screen = 4;
+          current_screen == 1; process_screen = 3;
         }
         display_counter = 0;
-        tareRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
       }
       display_counter++;
-      
     }
     // Scale: Tare successful
     else if ((current_screen == 2) && String(menu_items[item_selected])=="Tare" && process_screen == 2) { // CALIBRATION SUB-MENU SCREEN
@@ -661,9 +660,11 @@ void loop() {
       u8g2.setCursor(0, 15);
       u8g2.print("Tare"); 
       u8g2.setCursor(0, 30);
-      u8g2.print("Compelete");          
+      u8g2.print("Compelete");   
+      Serial.println("Tare: Tare successful");       
       //------------------------- DELAY -------------------------------   
       //Serial.println(display_counter);
+      tareRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
       if(display_counter == DELAY_COUNTER){ // Delay
         process_screen = 0;
         display_counter = 0;
@@ -679,7 +680,8 @@ void loop() {
       u8g2.setCursor(0, 15);
       u8g2.print("Tare"); 
       u8g2.setCursor(0, 30);
-      u8g2.print("Failed.");          
+      u8g2.print("Failed.");   
+      Serial.println("Tare: FAILED to tare");       
       //------------------------- DELAY -------------------------------   
       //Serial.println(display_counter);
       if(display_counter == DELAY_COUNTER){ // Delay
@@ -691,7 +693,7 @@ void loop() {
       //----------------------------------------------------------------------------     
     }  
     // Scale: disconnected
-    else if ((current_screen == 2) && String(menu_items[item_selected])=="Tare" && process_screen == 4) { // CALIBRATION SUB-MENU SCREEN
+    else if ((current_screen == 2) && process_screen == 4) { // CALIBRATION SUB-MENU SCREEN
       // Serial.println("In tare screen 2. Process screen 4"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
@@ -712,11 +714,15 @@ void loop() {
     // Calibration: Remove all weight off scale
     else if ((current_screen == 1) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
       // Serial.println("In calibrate screen"); // DEBUGGING CODE
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.print("Clear scale");
-      u8g2.setCursor(0, 30);
-      u8g2.println("Enter once clear");    
+      if(connected){
+        u8g2.setFont(u8g_font_7x14B);
+        u8g2.setCursor(0, 15);
+        u8g2.print("Clear scale");
+        u8g2.setCursor(0, 30);
+        u8g2.println("Enter once clear");   
+      }else{
+        current_screen == 1; process_screen = 3;
+      }
     }
     // Calibration: Taring
     else if ((current_screen == 2) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
@@ -735,7 +741,7 @@ void loop() {
         Serial.println("Calibrate: Updated tare characteristic."); // DEBUGGING CODE
         process_screen = 1;
       }else{
-        process_screen = 4;
+        current_screen == 1; process_screen = 3;
       }   
     }
     // Calibration: WAIT for scale response
@@ -748,7 +754,7 @@ void loop() {
       u8g2.print("Please wait");      
       //------------------------- WAIT FOR SCALE TARE CONFIRMATION --------------------------------  
       // If we are connected to a peer BLE Server, update the TARE characteristic
-      if(display_counter == DELAY_COUNTER){ // Delay
+      if(display_counter == 2*DELAY_COUNTER){ // Delay
         if (connected) { // Read values from server
           String value = tareRemoteCharacteristic->readValue().c_str();
           // Serial.println(value.c_str());
@@ -760,7 +766,7 @@ void loop() {
             Serial.println("Calibrate: FAILED to tare");
           }
         }else{
-          process_screen = 4;
+          current_screen == 1; process_screen = 3;
         }
         display_counter = 0;
         tareRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
@@ -803,23 +809,6 @@ void loop() {
       display_counter++;
       //----------------------------------------------------------------------------     
     }  
-    // Calibration Scale: disconnected
-    else if ((current_screen == 2) && String(menu_items[item_selected])=="Calibrate" && process_screen == 4) { // CALIBRATION SUB-MENU SCREEN
-      // Serial.println("In tare screen 2. Process screen 4"); // DEBUGGING CODE
-      Serial.println("Calibrate: Disconnected from server");
-      u8g2.setFont(u8g_font_7x14B);
-      u8g2.setCursor(0, 15);
-      u8g2.print("Disconnected...");       
-      //------------------------- DELAY -------------------------------   
-      //Serial.println(display_counter);
-      if(display_counter == DELAY_COUNTER){ // Delay
-        process_screen = 0;
-        display_counter = 0;
-        current_screen = 0;
-      }
-      display_counter++;
-      //----------------------------------------------------------------------------     
-    }  
     // Calibration: Calibrate with 105g weight
     else if ((current_screen == 2) && String(menu_items[item_selected])=="Calibrate" && process_screen == 5) { // CALIBRATION SUB-MENU SCREEN
       // Serial.println("In calibrate screen 2. Process screen 5"); // DEBUGGING CODE
@@ -845,7 +834,7 @@ void loop() {
         calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
         process_screen = 7;
       }else{
-        process_screen = 4;
+       current_screen == 1; process_screen = 3;
       }
       
     }
@@ -867,7 +856,7 @@ void loop() {
             current_screen = 2; process_screen = 9;
           }
         }else{
-          process_screen = 4;
+          current_screen == 1; process_screen = 3;
         } 
     }
     // SUCCESSFUL read
@@ -925,7 +914,7 @@ void loop() {
         current_screen = 3;
         process_screen = 2;
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected screen
       }
       
     }
@@ -947,7 +936,7 @@ void loop() {
             current_screen = 2; process_screen = 9; // Go to FAILED READING screen
           }
         }else{
-          current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+          current_screen == 1; process_screen = 3; // Go to the Disconnected 
         }
       //--------------------------------------------  
     }
@@ -977,8 +966,8 @@ void loop() {
         current_screen = 4;
         process_screen = 2;
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
-      }
+        current_screen == 1; process_screen = 3; // Go to the Disconnected
+      } 
     }
 
     else if ((current_screen == 4) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // TARE SCALE SUB-MENU SCREEN
@@ -999,114 +988,114 @@ void loop() {
             current_screen = 2; process_screen = 9; // Go to FAILED READING screen
           }
         }else{
-          current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+          current_screen == 1; process_screen = 3; // Go to the Disconnected 
         }
       //-------------------------------------------- 
     }
-    // // Calibration: Calibrate with 190g weight
-    // else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 5. Process screen 0"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(known_calibration_masses[3]) + "g"); 
-    //   u8g2.setCursor(0, 30);
-    //   u8g2.print("weight on scale");  
-    //   u8g2.setCursor(0, 45);
-    //   u8g2.println("Enter once placed");    
-    //   // Wait for yes confirmation (clicked button)    
+    // Calibration: Calibrate with 190g weight
+    else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 5. Process screen 0"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Place a " + String(known_calibration_masses[3]) + "g"); 
+      u8g2.setCursor(0, 30);
+      u8g2.print("weight on scale");  
+      u8g2.setCursor(0, 45);
+      u8g2.println("Enter once placed");    
+      // Wait for yes confirmation (clicked button)    
       
-    // } // WAIT for scale to take 190g calibration reading
-    // else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 1) { // TARE SCALE SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 5, process screen 1"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Reading..."); 
-    //   //------------------------- CALIBRATE WITH 225g --------------------------------
-    //   if (connected) { // Read values from server
-    //     calibrate_weight = known_calibration_masses[3];
-    //     // Set the characteristic's value to calibration weight value
-    //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
-    //     current_screen = 5;
-    //     process_screen = 2;
-    //   }else{
-    //     current_screen = 2; process_screen = 4; // Go to the Disconnected screen
-    //   }      
-    // }
+    } // WAIT for scale to take 190g calibration reading
+    else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 1) { // TARE SCALE SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 5, process screen 1"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Reading..."); 
+      //------------------------- CALIBRATE WITH 225g --------------------------------
+      if (connected) { // Read values from server
+        calibrate_weight = known_calibration_masses[3];
+        // Set the characteristic's value to calibration weight value
+        calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
+        current_screen = 5;
+        process_screen = 2;
+      }else{
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
+      }      
+    }
 
-    // else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // TARE SCALE SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 5, process screen 2"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Reading..."); 
-    //   //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
-    //   // If we are connected to a peer BLE Server, update the TARE characteristic
-    //     if (connected) { // Read values from server
-    //       String value = calibrateRemoteCharacteristic->readValue().c_str(); 
-    //       // Serial.println(value.c_str());
-    //       if(value == "ok"){
-    //         calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
-    //         current_screen = 2; process_screen = 8; // Go to SUCCESSFUL READING screen
-    //       }else if (value =="nok"){
-    //         calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
-    //         current_screen = 2; process_screen = 9; // Go to FAILED READING screen
-    //       }
-    //     }else{
-    //       current_screen = 2; process_screen = 4; // Go to the Disconnected screen
-    //     }
-    //   //--------------------------------------------     
-    // }
-    // // Calibration: Calibrate with 225g weight
-    // else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 6. Process screen 0"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(known_calibration_masses[4]) + "g"); 
-    //   u8g2.setCursor(0, 30);
-    //   u8g2.print("weight on scale");  
-    //   u8g2.setCursor(0, 45);
-    //   u8g2.println("Enter once placed");    
-    //   // Wait for yes confirmation (clicked button)    
+    else if ((current_screen == 5) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // TARE SCALE SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 5, process screen 2"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Reading..."); 
+      //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
+      // If we are connected to a peer BLE Server, update the TARE characteristic
+        if (connected) { // Read values from server
+          String value = calibrateRemoteCharacteristic->readValue().c_str(); 
+          // Serial.println(value.c_str());
+          if(value == "ok"){
+            calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+            current_screen = 2; process_screen = 8; // Go to SUCCESSFUL READING screen
+          }else if (value =="nok"){
+            calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+            current_screen = 2; process_screen = 9; // Go to FAILED READING screen
+          }
+        }else{
+          current_screen == 1; process_screen = 3; // Go to the Disconnected 
+        }
+      //--------------------------------------------     
+    }
+    // Calibration: Calibrate with 225g weight
+    else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 6. Process screen 0"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Place a " + String(known_calibration_masses[4]) + "g"); 
+      u8g2.setCursor(0, 30);
+      u8g2.print("weight on scale");  
+      u8g2.setCursor(0, 45);
+      u8g2.println("Enter once placed");    
+      // Wait for yes confirmation (clicked button)    
       
-    // } // WAIT for scale to take 265g calibration reading
-    // else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 1) { // TARE SCALE SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 6, process screen 1"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Reading..."); 
-    //   //------------------------- CALIBRATE WITH 225 --------------------------------
-    //   if (connected) { // Read values from server
-    //     calibrate_weight = known_calibration_masses[4];
-    //     // Set the characteristic's value to calibration weight value
-    //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
-    //     current_screen = 6;
-    //     process_screen = 2;
-    //   }else{
-    //     current_screen = 2; process_screen = 4; // Go to the Disconnected screen
-    //   }      
-    // }
+    } // WAIT for scale to take 265g calibration reading
+    else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 1) { // TARE SCALE SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 6, process screen 1"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Reading..."); 
+      //------------------------- CALIBRATE WITH 225 --------------------------------
+      if (connected) { // Read values from server
+        calibrate_weight = known_calibration_masses[4];
+        // Set the characteristic's value to calibration weight value
+        calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
+        current_screen = 6;
+        process_screen = 2;
+      }else{
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
+      }      
+    }
 
-    // else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // TARE SCALE SUB-MENU SCREEN
-    //   // Serial.println("In calibrate screen 6, process screen 2"); // DEBUGGING CODE
-    //   u8g2.setFont(u8g_font_7x14B);
-    //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Reading..."); 
-    //   //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
-    //   // If we are connected to a peer BLE Server, update the TARE characteristic
-    //     if (connected) { // Read values from server
-    //       String value = calibrateRemoteCharacteristic->readValue().c_str(); 
-    //       // Serial.println(value.c_str());
-    //       if(value == "ok"){
-    //         calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
-    //         current_screen = 2; process_screen = 8; // Go to SUCCESSFUL READING screen
-    //       }else if (value =="nok"){
-    //         calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
-    //         current_screen = 2; process_screen = 9; // Go to FAILED READING screen
-    //       }
-    //     }else{
-    //       current_screen = 2; process_screen = 4; // Go to the Disconnected screen
-    //     }
-    //   //--------------------------------------------  
-    // }
+    else if ((current_screen == 6) && String(menu_items[item_selected])=="Calibrate" && process_screen == 2) { // TARE SCALE SUB-MENU SCREEN
+      // Serial.println("In calibrate screen 6, process screen 2"); // DEBUGGING CODE
+      u8g2.setFont(u8g_font_7x14B);
+      u8g2.setCursor(0, 15);
+      u8g2.print("Reading..."); 
+      //------------------------- WAIT FOR SCALE READING CONFIRMATION --------------------------------  
+      // If we are connected to a peer BLE Server, update the TARE characteristic
+        if (connected) { // Read values from server
+          String value = calibrateRemoteCharacteristic->readValue().c_str(); 
+          // Serial.println(value.c_str());
+          if(value == "ok"){
+            calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+            current_screen = 2; process_screen = 8; // Go to SUCCESSFUL READING screen
+          }else if (value =="nok"){
+            calibrateRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // tell the server to reset the characteristic value
+            current_screen = 2; process_screen = 9; // Go to FAILED READING screen
+          }
+        }else{
+          current_screen == 1; process_screen = 3; // Go to the Disconnected 
+        }
+      //--------------------------------------------  
+    }
     // // Calibration: Calibrate with 260g weight
     // else if ((current_screen == 7) && String(menu_items[item_selected])=="Calibrate" && process_screen == 0) { // CALIBRATION SUB-MENU SCREEN
     //   // Serial.println("In calibrate screen 7. Process screen 0"); // DEBUGGING CODE
@@ -1227,7 +1216,7 @@ void loop() {
         Serial.println("Calibrate: calibrate characteristic set to save.");
         current_screen = 9; process_screen = 1;
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
       }
       //----------------------------------------------------------------------------     
     }
@@ -1254,7 +1243,7 @@ void loop() {
           Serial.println("Calibrate: FAILED to save calibration value");
         }
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
       }
       //----------------------------------------------------------------------------     
     }
@@ -1277,7 +1266,7 @@ void loop() {
         Serial.println("Calibrate: calibrate characteristic set to done.");
         current_screen = 9; process_screen = 3;
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
       }
       //----------------------------------------------------------------------------     
     }   
@@ -1303,7 +1292,7 @@ void loop() {
           Serial.println("Calibrate: FAILED to complete calibration");
         }
       }else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
       }  
       // Serial.println(display_counter);
       // Delay
@@ -1362,7 +1351,7 @@ void loop() {
       u8g2.setCursor(0, 30);
       u8g2.print(myDevice->getName().c_str());
       if(display_counter == DELAY_COUNTER){ // Delay did not work :(
-        process_screen = 3;
+        current_screen = 1; process_screen = 100;
         display_counter = 0;
       }
       display_counter++;
@@ -1375,12 +1364,12 @@ void loop() {
       u8g2.print("Connect Failed.");  // Add Perch name (get from server)
       if(display_counter == DELAY_COUNTER){ // Delay did not work :(
         Serial.println("Connect: Server not found.");
-        process_screen = 3;
+        current_screen = 1; process_screen = 100;
         display_counter = 0;
       }
       display_counter++;
     }
-    else if ((current_screen == 1) && String(menu_items[item_selected])=="Connect" && process_screen ==3) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 1) && String(menu_items[item_selected])=="Connect" && process_screen ==100) { // SCALE SUB-MENU SCREEN
       // Serial.println("Exit");
       current_screen = 0;
       process_screen = 0;
@@ -1445,7 +1434,7 @@ void loop() {
 
     //------------------------- DISABLE BLE -------------------------------   
     // Attempting to disable
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 1) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 0) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Disabling");
@@ -1456,18 +1445,17 @@ void loop() {
       Serial.println("BLE: Attempting to disable BLE (sending disable msg).");
 
       if(connected){
-          pRemoteCharacteristic->writeValue(disableMsg.c_str(),disableMsg.length()); // tell the server to disable BLE
+          pRemoteCharacteristic->writeValue(ble_disable_msg.c_str(),ble_disable_msg.length()); // tell the server to disable BLE
           Serial.println("BLE: Attempting to disable BLE.");
-          current_screen == 10; process_screen == 2;
+          current_screen == 10; process_screen == 1;
         }
       else{
-        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+        current_screen == 1; process_screen = 3; // Go to the Disconnected 
       }
       //----------------------------------------------------------------------------
     }
-
     // Attempting to disable (Receive response)
-    else if ((current_screen == 10) && connected && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 2) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && connected && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Disabling");
@@ -1475,23 +1463,23 @@ void loop() {
        u8g2.print("BLE.");
 
       Serial.println("In disable screen"); // DEBUGGING CODE
-      Serial.println("BLE: Attempting to disable BLE (read characteristic).");
+      Serial.println("BLE: Attempting to disable BLE (read the connect characteristic).");
 
       String value = pRemoteCharacteristic->readValue();
 
       if(value == "nok"){
           pRemoteCharacteristic->writeValue(rstMsg.c_str(),rstMsg.length()); // reset characteristic
           Serial.println("BLE: Failed to disabled BLE.\nReceived a response.");
-          current_screen == 10; process_screen == 4; // Go to failed screen
+          current_screen == 10; process_screen == 3; // Go to failed screen
         }
       else{
-        current_screen = 10; process_screen = 3; // Go to the success screen
+        current_screen = 10; process_screen = 2; // Go to the success screen
       }
       //----------------------------------------------------------------------------
     }
 
   // Succesfully disabled BLE screen
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 3) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 2) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
        u8g2.print("Successfully");
@@ -1509,10 +1497,10 @@ void loop() {
     }    
 
   // Failed to disabled BLE screen
-    else if ((current_screen == 10) && String(menu_items[item_selected])=="DisableBLE"  && process_screen == 4) { // SCALE SUB-MENU SCREEN
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 3) { // SCALE SUB-MENU SCREEN
        u8g2.setFont(u8g_font_7x14B);
        u8g2.setCursor(0, 15);
-       u8g2.print("Unable to");
+       u8g2.print("Failed to");
        u8g2.setCursor(0, 30);
        u8g2.print("disable");
        u8g2.setCursor(0, 45);
