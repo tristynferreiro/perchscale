@@ -107,7 +107,7 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 
 
 // Menu variables
 
-const int NUM_ITEMS = 5; // number of items in the list
+const int NUM_ITEMS = 6; // number of items in the list
 const int MAX_ITEM_LENGTH = 11; // maximum characters for the item name
 
 char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
@@ -115,7 +115,8 @@ char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "Read" }, 
   { "Tare" },
   { "Calibrate" },
-  { "Disconnect" }
+  { "Disconnect" },
+  { "Disable BLE "}
  };
 
 int current_screen = 0; // screen number which the menu is on
@@ -136,7 +137,7 @@ int button_back_clicked = 0; // same as above
 // Calibration weights
 int calibrate_weight = 10;
 const int NUM_POINTS = 3; // number of items in the list
-int calibration_weights [NUM_POINTS] = {  // List of calibration weights used (in grams)
+int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights used (in grams)
   // 50,
   // 60,
   // 70,
@@ -150,6 +151,7 @@ int calibration_weights [NUM_POINTS] = {  // List of calibration weights used (i
 static String rstMsg = "rst";
 static String doneMsg = "done";
 static String saveMsg = "save";
+statis String disableMsg = "disable";
 // Connect service:
 BLEClient*  pClient;
 // The remote service we wish to connect to.
@@ -417,25 +419,25 @@ void loop() {
      else if (current_screen == 2 && process_screen == 5 && String(menu_items[item_selected])=="Calibrate") {
       process_screen = 6;
       current_screen = 2;}
-    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[0] && String(menu_items[item_selected])=="Calibrate") {
+    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[0] && String(menu_items[item_selected])=="Calibrate") {
     process_screen = 0;
     current_screen = 3;}
-    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[1] && String(menu_items[item_selected])=="Calibrate") {
+    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[1] && String(menu_items[item_selected])=="Calibrate") {
     process_screen = 0;
     current_screen = 4;}
-    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[2] && String(menu_items[item_selected])=="Calibrate") {
+    else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[2] && String(menu_items[item_selected])=="Calibrate") {
     process_screen = 0;
     current_screen = 9;}
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[3] && String(menu_items[item_selected])=="Calibrate") {
+    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[3] && String(menu_items[item_selected])=="Calibrate") {
     // process_screen = 0;
     // current_screen = 6;}
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[4] && String(menu_items[item_selected])=="Calibrate") {
+    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[4] && String(menu_items[item_selected])=="Calibrate") {
     // process_screen = 0;
     // current_screen = 7;} 
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[5] && String(menu_items[item_selected])=="Calibrate") {
+    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[5] && String(menu_items[item_selected])=="Calibrate") {
     // process_screen = 0;
     // current_screen = 8;} 
-    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == calibration_weights[6] && String(menu_items[item_selected])=="Calibrate") {
+    // else if (current_screen == 2 && process_screen == 8 && calibrate_weight == known_calibration_masses[6] && String(menu_items[item_selected])=="Calibrate") {
     // process_screen = 0;
     // current_screen = 9;} 
     else if (current_screen == 2 && process_screen == 8 && String(menu_items[item_selected])=="Calibrate") {
@@ -459,6 +461,9 @@ void loop() {
     else if (current_screen == 8 && process_screen ==0 && String(menu_items[item_selected])=="Calibrate") {
       current_screen = 8;
       process_screen = 1;}
+    else if (current_screen == 0 && process_screen == 0 && String(menu_items[item_selected])=="Disable BLE") {
+      current_screen = 10;
+      process_screen = 1;}      
     //else if (current_screen == 4 && process_screen ==1 && String(menu_items[item_selected])=="Calibrate") {current_screen = 5;}
     //  else {current_screen = 0;} // qr codes screen --> menu items screen
   }
@@ -820,7 +825,7 @@ void loop() {
       // Serial.println("In calibrate screen 2. Process screen 5"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
-      u8g2.print("Place a " + String(calibration_weights[0]) + "g"); 
+      u8g2.print("Place a " + String(known_calibration_masses[0]) + "g"); 
       u8g2.setCursor(0, 30);
       u8g2.print("weight on scale");  
       u8g2.setCursor(0, 45);
@@ -835,7 +840,7 @@ void loop() {
       u8g2.print("Reading..."); 
       //------------------------- CALIBRATE WITH 105g --------------------------------
       if (connected) { // Read values from server
-        calibrate_weight = calibration_weights[0];
+        calibrate_weight = known_calibration_masses[0];
         // Set the characteristic's value to calibration weight value
         calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
         process_screen = 7;
@@ -899,7 +904,7 @@ void loop() {
       // Serial.println("In calibrate screen 3. Process screen 0"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
-      u8g2.print("Place a " + String(calibration_weights[1]) + "g"); 
+      u8g2.print("Place a " + String(known_calibration_masses[1]) + "g"); 
       u8g2.setCursor(0, 30);
       u8g2.print("weight on scale");  
       u8g2.setCursor(0, 45);
@@ -914,7 +919,7 @@ void loop() {
       u8g2.print("Reading..."); 
       //------------------------- CALIBRATE WITH 120g --------------------------------
       if (connected) { // Read values from server
-        calibrate_weight = calibration_weights[1];
+        calibrate_weight = known_calibration_masses[1];
         // Set the characteristic's value to calibration weight value
         calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length());  
         current_screen = 3;
@@ -951,7 +956,7 @@ void loop() {
       // Serial.println("In calibrate screen 4. Process screen 0"); // DEBUGGING CODE
       u8g2.setFont(u8g_font_7x14B);
       u8g2.setCursor(0, 15);
-      u8g2.print("Place a " + String(calibration_weights[2]) + "g"); 
+      u8g2.print("Place a " + String(known_calibration_masses[2]) + "g"); 
       u8g2.setCursor(0, 30);
       u8g2.print("weight on scale");  
       u8g2.setCursor(0, 45);
@@ -966,7 +971,7 @@ void loop() {
       u8g2.print("Reading..."); 
       //------------------------- CALIBRATE WITH 150g --------------------------------
       if (connected) { // Read values from server
-        calibrate_weight = calibration_weights[2];
+        calibrate_weight = known_calibration_masses[2];
         // Set the characteristic's value to calibration weight value
         calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
         current_screen = 4;
@@ -1003,7 +1008,7 @@ void loop() {
     //   // Serial.println("In calibrate screen 5. Process screen 0"); // DEBUGGING CODE
     //   u8g2.setFont(u8g_font_7x14B);
     //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(calibration_weights[3]) + "g"); 
+    //   u8g2.print("Place a " + String(known_calibration_masses[3]) + "g"); 
     //   u8g2.setCursor(0, 30);
     //   u8g2.print("weight on scale");  
     //   u8g2.setCursor(0, 45);
@@ -1018,7 +1023,7 @@ void loop() {
     //   u8g2.print("Reading..."); 
     //   //------------------------- CALIBRATE WITH 225g --------------------------------
     //   if (connected) { // Read values from server
-    //     calibrate_weight = calibration_weights[3];
+    //     calibrate_weight = known_calibration_masses[3];
     //     // Set the characteristic's value to calibration weight value
     //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
     //     current_screen = 5;
@@ -1055,7 +1060,7 @@ void loop() {
     //   // Serial.println("In calibrate screen 6. Process screen 0"); // DEBUGGING CODE
     //   u8g2.setFont(u8g_font_7x14B);
     //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(calibration_weights[4]) + "g"); 
+    //   u8g2.print("Place a " + String(known_calibration_masses[4]) + "g"); 
     //   u8g2.setCursor(0, 30);
     //   u8g2.print("weight on scale");  
     //   u8g2.setCursor(0, 45);
@@ -1070,7 +1075,7 @@ void loop() {
     //   u8g2.print("Reading..."); 
     //   //------------------------- CALIBRATE WITH 225 --------------------------------
     //   if (connected) { // Read values from server
-    //     calibrate_weight = calibration_weights[4];
+    //     calibrate_weight = known_calibration_masses[4];
     //     // Set the characteristic's value to calibration weight value
     //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
     //     current_screen = 6;
@@ -1107,7 +1112,7 @@ void loop() {
     //   // Serial.println("In calibrate screen 7. Process screen 0"); // DEBUGGING CODE
     //   u8g2.setFont(u8g_font_7x14B);
     //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(calibration_weights[5]) + "g"); 
+    //   u8g2.print("Place a " + String(known_calibration_masses[5]) + "g"); 
     //   u8g2.setCursor(0, 30);
     //   u8g2.print("weight on scale");  
     //   u8g2.setCursor(0, 45);
@@ -1122,7 +1127,7 @@ void loop() {
     //   u8g2.print("Reading..."); 
     //   //------------------------- CALIBRATE WITH 275g --------------------------------
     //   if (connected) { // Read values from server
-    //     calibrate_weight = calibration_weights[5];
+    //     calibrate_weight = known_calibration_masses[5];
     //     // Set the characteristic's value to calibration weight value
     //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
     //     current_screen = 7;
@@ -1159,7 +1164,7 @@ void loop() {
     //   // Serial.println("In calibrate screen 8. Process screen 0"); // DEBUGGING CODE
     //   u8g2.setFont(u8g_font_7x14B);
     //   u8g2.setCursor(0, 15);
-    //   u8g2.print("Place a " + String(calibration_weights[6]) + "g"); 
+    //   u8g2.print("Place a " + String(known_calibration_masses[6]) + "g"); 
     //   u8g2.setCursor(0, 30);
     //   u8g2.print("weight on scale");  
     //   u8g2.setCursor(0, 45);
@@ -1174,7 +1179,7 @@ void loop() {
     //   u8g2.print("Reading..."); 
     //   //------------------------- CALIBRATE WITH 275g --------------------------------
     //   if (connected) { // Read values from server
-    //     calibrate_weight = calibration_weights[6];
+    //     calibrate_weight = known_calibration_masses[6];
     //     // Set the characteristic's value to calibration weight value
     //     calibrateRemoteCharacteristic->writeValue(String(calibrate_weight).c_str(),String(calibrate_weight).length()); 
     //     current_screen = 8;
@@ -1437,6 +1442,89 @@ void loop() {
         display_counter++;
       //----------------------------------------------------------------------------
     }
+
+    //------------------------- DISABLE BLE -------------------------------   
+    // Attempting to disable
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 1) { // SCALE SUB-MENU SCREEN
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Disabling");
+       u8g2.setCursor(0, 30);
+       u8g2.print("BLE.");
+
+      Serial.println("In disable screen"); // DEBUGGING CODE
+      Serial.println("BLE: Attempting to disable BLE (sending disable msg).");
+
+      if(connected){
+          pRemoteCharacteristic->writeValue(disableMsg.c_str(),disableMsg.length()); // tell the server to disable BLE
+          Serial.println("BLE: Attempting to disable BLE.");
+          current_screen == 10; process_screen == 2;
+        }
+      else{
+        current_screen = 2; process_screen = 4; // Go to the Disconnected screen
+      }
+      //----------------------------------------------------------------------------
+    }
+
+    // Attempting to disable (Receive response)
+    else if ((current_screen == 10) && connected && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 2) { // SCALE SUB-MENU SCREEN
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Disabling");
+       u8g2.setCursor(0, 30);
+       u8g2.print("BLE.");
+
+      Serial.println("In disable screen"); // DEBUGGING CODE
+      Serial.println("BLE: Attempting to disable BLE (read characteristic).");
+
+      std::string value = pRemoteCharacteristic->readValue();
+
+      if(value == "nok"){
+          pRemoteCharacteristic->writeValue(rst.c_str(),rst.length()); // reset characteristic
+          Serial.println("BLE: Failed to disabled BLE.\nReceived a response.");
+          current_screen == 10; process_screen == 4; // Go to failed screen
+        }
+      else{
+        current_screen = 10; process_screen = 3; // Go to the success screen
+      }
+      //----------------------------------------------------------------------------
+    }
+
+  // Succesfully disabled BLE screen
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 3) { // SCALE SUB-MENU SCREEN
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Successfully");
+       u8g2.setCursor(0, 30);
+       u8g2.print("disabled");
+       u8g2.setCursor(0, 45);
+       u8g2.print("BLE!");
+       if(display_counter == DELAY_COUNTER){ // Exit to main menu
+        current_screen = 0;
+        process_screen = 0;
+        display_counter = 0;
+      }
+        display_counter++;
+      //----------------------------------------------------------------------------
+    }    
+
+  // Failed to disabled BLE screen
+    else if ((current_screen == 10) && String(menu_items[item_selected])=="Disable BLE"  && process_screen == 4) { // SCALE SUB-MENU SCREEN
+       u8g2.setFont(u8g_font_7x14B);
+       u8g2.setCursor(0, 15);
+       u8g2.print("Unable to");
+       u8g2.setCursor(0, 30);
+       u8g2.print("disable");
+       u8g2.setCursor(0, 45);
+       u8g2.print("BLE");
+       if(display_counter == DELAY_COUNTER){ // Exit to main menu
+        current_screen = 0;
+        process_screen = 0;
+        display_counter = 0;
+      }
+        display_counter++;
+      //----------------------------------------------------------------------------
+    }    
 
   u8g2.sendBuffer(); // send buffer from RAM to display controller
 
