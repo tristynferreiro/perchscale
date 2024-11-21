@@ -30,9 +30,14 @@
 */
 
 //-----------------CODE SETUP---------------------
-#define OLED_CONNECTED // comment if the OLED will not be attached to the device
-#define READING_THRESHOLD 100 // [in g] this is the reading event threshold 
-float calibration_factor = 1.0; // default factor
+//#define OLED_CONNECTED // comment if the OLED will not be attached to the device
+
+// Harry: I changed the reading threshold to be able to weight Fork-tailed Drongos, can be adjusted based on scenario.
+#define READING_THRESHOLD 35 // [in g] this is the reading event threshold 
+
+// Harry: I have been changing this manually at initial startup in the field as the calibration process has been difficult in some circumstances.
+float calibration_factor =1; // default factor 
+
 // BLE Server
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -313,7 +318,7 @@ void read(bool controller_mode){
 
   // check for new data/start next conversion:
   if (LoadCell.update()) new_data_ready = true;
-    
+  
   if (new_data_ready) {
     reading = LoadCell.getData();
 
@@ -332,7 +337,7 @@ void read(bool controller_mode){
       new_data_ready = 0;  
 
       if(controller_mode) read_characteristic->setValue(String(reading_data_msg).c_str()); // BLE: Updating value to scale reading  
-        
+      
     }     
     else{ // IF THERE IS NO BIRD
       #ifdef OLED_CONNECTED
@@ -355,9 +360,10 @@ void read(bool controller_mode){
         logData(SD, "s", "tare",0);
 
         Serial.println("Next Tare Complete");
-        
       }
+
     }
+    
   }
 }
 
@@ -633,6 +639,10 @@ void logData(fs::FS &fs, String mode, String type, float reading){
 void setup() {
   //----------SERIAL SETUP------------------------
   Serial.begin(9600); // Initialise baud rate with PC
+
+  // Harry: This delay helped with reading the whole startup routine on the Serial monitor
+  delay(2000);
+
   Serial.println("\n*************************");
   Serial.println("Beginning startup routine.");
 
@@ -647,24 +657,44 @@ void setup() {
   #endif
 
   //--------------------RTC SETUP-----------------------
-  Wire.begin(); // required by the RTClib library because I2C is used
+  // Initialize EEPROM with specified size
+  EEPROM.begin(512);
+
+  // Initialize I2C communication for RTC
+  Wire.begin();
 
   // Check if RTC is connected
   if (!rtc.begin()) {
     Serial.println("RTC not found.");
-    while (1);
+    while (1); // Stop if RTC not found
   }
 
-  // Write PC time to RTC
-  Serial.println("Setting RTC using connected PC.");
-  rtc.adjust(DateTime(__DATE__, __TIME__));
-  
-  now = rtc.now();
+  //RTC EEPROM setup added to ensure that RTC did not reset, to value from last time code uploaded, at each power up.
+  //Can be commented to reset RTC
+
+  // Read the setup flag from EEPROM at address 1
+  byte setupCompleted = EEPROM.read(1);
+
+  // If setup flag is not set, run initial setup
+  if (setupCompleted != 1) {
+    Serial.println("First-time setup: Setting RTC with PC time.");
+    rtc.adjust(DateTime(__DATE__, __TIME__)); // Set RTC with compile time
+
+    // Set the flag in EEPROM to indicate initial setup is done
+    EEPROM.write(1, 1);
+    EEPROM.commit();  // Commit changes to save in EEPROM
+  } else {
+    Serial.println("RTC setup has already been completed.");
+  }
+
+  // Print the current date and time from RTC
+  DateTime now = rtc.now();
   char temp[20];
-  sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d",  now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year()); 
+  sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year());
   Serial.println(temp);
 
-  Serial.println("RTC started.");
+  Serial.println("Startup routine completed.");
+
 
   //--------------------SD CARD SETUP-----------------------
   // Check if the SD card module is connected
@@ -709,7 +739,6 @@ void setup() {
     }
     LoadCell.setCalFactor(calibration_factor); // originally set to a default value and then updated later.
     Serial.println(String("Loadcell: calibration factor set to ") + String(calibration_factor));
-  //   LoadCell.setCalFactor(1.0); // user set calibration value (float), initial value 1.0 may be used for this sketch
   }
   Serial.println("Loadcell: Startup is complete");
  
@@ -771,9 +800,22 @@ void setup() {
   Serial.println("Startup complete");
   Serial.println("*************************");
   // Serial.println(log_buffer);
+  
+  // Harry: extra error checking for time of RTC at end of Startup
+  //Serial.println(temp);
+
+  // Harry: Setting old_hour to an time at Startup ensured that its operation did not escape 1st hour of use when old_hour is set to null.
+  old_hour=now.hour();
 };
 
 void loop() {
+  // Harry: Load cell would lose calibration factor when controller connected so to ensure that each reading used calibration factor it is set in each loop
+  // Could be a more effiicient way.
+  LoadCell.setCalFactor(calibration_factor);
+  
+  //Harry: Not sure if necessary but when added it worked and did not want to remove the setting of now each loop
+  now = rtc.now();
+
   if(device_connected){ 
 
     String ble_connectVal = pCharacteristic->getValue().c_str(); // BLE: read 
