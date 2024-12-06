@@ -36,7 +36,7 @@
 #define READING_THRESHOLD 35 // [in g] this is the reading event threshold 
 
 // Harry: I have been changing this manually at initial startup in the field as the calibration process has been difficult in some circumstances.
-float calibration_factor =1; // default factor 
+float calibration_factor = 1.00; // default factor 
 
 // BLE Server
 // See the following for generating UUIDs:
@@ -91,6 +91,11 @@ float calibration_factor =1; // default factor
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 //--------------------GLOBAL VARIABLES-----------------
+// EEPROM ADDRESSES
+const int setup_completion_flag_eepromAddress = 0;
+const int calVal_eepromAddress = 0;
+
+
 // DATA FILES
 char file_name_path[31] = "/weight_readings_test.txt";
 char calibrate_file_name_path[31] = "/calibrate_values_test.txt";
@@ -117,9 +122,6 @@ char known_calibration_masses [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of cal
 float calibration_weight_values [NUM_POINTS]; // used to determine the calibration factor
 bool calibrate_complete_flag = false;
 
-// EEPROM address
-const int calVal_eepromAdress = 0;
-// const int threshhold_eepromAdress = 1;
 
 // OLED
 #ifdef OLED_CONNECTED
@@ -223,10 +225,12 @@ class ServerCallbacks: public BLEServerCallbacks {
       calibrate_characteristic->setValue("calibrate"); 
       Serial.println("BLE: Reset characteristics.");
       logMessage(SD, "BLE: Reset characteristics.",INFO_LEVEL);
+      delay(200); // Required to send the serial prints
 
       BLEDevice::startAdvertising();
       Serial.println("BLE: Started re-advertising.");
       logMessage(SD, "BLE: Started re-advertising.",INFO_LEVEL);
+      delay(200); // Required to send the serial prints
     }
 };
 
@@ -312,7 +316,7 @@ void appendFile(fs::FS &fs,  const char * path, const char * message){
 
 void read(bool controller_mode){
   /*
-  * This function is the main operation of the scale. Here the HX711 is polled and when it returns a value (reading), if that value is greater than the bird threshold, it is saved to the text file, otherwise the reading is ignored and periodically the scale is tared.
+  * This function is the main operation of the scale. Here the HX711 is polled and when it returns a value (reading), if that value is greater than the bird detection threshold, it is saved to the text file, otherwise the reading is ignored and periodically the scale is tared.
   * bool controller_mode is used to ensure that the BLE characteristics are set
   */
 
@@ -345,44 +349,48 @@ void read(bool controller_mode){
       #endif
 
       if(controller_mode)read_characteristic->setValue(String("No bird").c_str()); // BLE: No bird detected on scale 
+      delay(10); // Required to send the serial prints
         
       reading_number = 1; // reset the number of readings in the current reading event
 
-      if(now.hour() != old_hour){ //Condition to trigger tare every hour
-        LoadCell.update();
-        LoadCell.tare();
-        #ifdef OLED_CONNECTED
-          writeToDisplayCentre(2.5, WHITE, "Tare done");
-        #endif
+      // DO NOT DO THIS, taring makes the calibration value incorrect.
+      // if(now.hour() != old_hour){ //Condition to trigger tare every hour
+      //   LoadCell.update();
+      //   LoadCell.tare();
+      //   #ifdef OLED_CONNECTED
+      //     writeToDisplayCentre(2.5, WHITE, "Tare done");
+      //   #endif
           
-        if(controller_mode)read_characteristic->setValue(String("Tared").c_str()); // BLE: Updating value
+      //   if(controller_mode)read_characteristic->setValue(String("Tared").c_str()); // BLE: Updating value
 
-        logData(SD, "s", "tare",0);
+      //   logData(SD, "s", "tare",0);
 
-        Serial.println("Next Tare Complete");
-      }
+      //   Serial.println("Next Tare Complete");
+      // }
 
     }
     
   }
 }
 
-void controllerRead(){
+void controllerRead(String ble_readVal){
   /*
   * This function is called to execute certain functions based on the BLE read characteristic value (sent from the PerchScale controller)
   */
 
-  String ble_readVal = read_characteristic->getValue().c_str(); // BLE: read characteristic
+  // String ble_readVal = read_characteristic->getValue().c_str(); // BLE: read characteristic
   // Serial.println("Read characteristic value: " + ble_readVal);
   
   if (ble_readVal == ble_rst_msg) {
-    Serial.println("Controller mode = read: Resetting read flag.");
     read_characteristic->setValue("read"); // BLE: set characteristic
+    Serial.println("Controller mode = read: Resetting read flag.");
     status = "connected"; // OLED reset the status
   } 
-  else if (ble_readVal != "read" && ble_readVal != ble_rst_msg) {
-    read(1);
-    status="read";
+  else if (ble_readVal != "read" && ble_readVal != ble_rst_msg) { 
+      // ble_readVal = "read" is the default read value, "r" is what initiates the reading. When the controller exits read mode then it sends a reset flag and the characteristic is reset to "read" which prevents the values from being read every loop iteration.
+    
+    read(1); // make a reading in controller mode
+    status = "read";
   } 
 }
 void controllerTare(){
@@ -401,7 +409,8 @@ void controllerTare(){
       status = "tare"; // OLED set the status
       Serial.println("Controller mode = tare: Tare command received");
       LoadCell.update();
-      LoadCell.tare(); //tare
+      // LoadCell.tare(); //tare
+      // DO NOTHING! TARING ACTUALLY CAUSES ISSUES
       
       tare_characteristic->setValue(ble_ok_msg.c_str()); // BLE: send OK 
       #ifdef OLED_CONNECTED
@@ -420,12 +429,14 @@ void controllerTare(){
     }
 };
 
-void controllerCalibrate(){
+void controllerCalibrate(String ble_calibrateVal){
   /*
   * This function is called to execute certain functions based on the BLE calibrate characteristic value (sent from the PerchScale controller)
   */
 
-  String ble_calibrateVal = calibrate_characteristic->getValue().c_str(); // BLE: check calibrate characteristic
+  // String ble_calibrateVal = calibrate_characteristic->getValue().c_str(); // BLE: get calibrate characteristic
+  // Serial.println(ble_calibrateVal);
+  // delay(200);
 
   // Note: I have no idea how to make this more efficient. I do not think that I can so for now, this is what it is. Will look into it in future because it works for now.
   if (ble_calibrateVal != ble_ok_msg && ble_calibrateVal != ble_rst_msg && !ble_calibrateVal.equals(known_calibration_masses[0]) && !ble_calibrateVal.equals(known_calibration_masses[1]) && !ble_calibrateVal.equals(known_calibration_masses[2]) && !ble_calibrateVal.equals(known_calibration_masses[3]) && !ble_calibrateVal.equals(known_calibration_masses[4]) && !ble_calibrateVal.equals(known_calibration_masses[5]) && !ble_calibrateVal.equals(known_calibration_masses[6]) && ble_calibrateVal != "calibrate" && ble_calibrateVal != "done" && ble_calibrateVal!= "save") {
@@ -471,8 +482,8 @@ void controllerCalibrate(){
       logMessage(SD, "Calibrate mode: calibration successful",INFO_LEVEL);
       calibrate_characteristic->setValue(ble_ok_msg.c_str()); // BLE: set characteristic
     }
-  }else{
-    // Run calibration
+  }else{ // Run calibration
+    Serial.println("Calibrate mode: Running calibration");
     // Reset the calibration value to 1 to get raw data
     LoadCell.setCalFactor(1.00);
 
@@ -490,7 +501,7 @@ void controllerCalibrate(){
       }
     }
   }
-  delay(100);
+  delay(200);
 };
 
 void getCalibrationPoint(String known_calibration_mass, int calibration_point_index) {
@@ -534,18 +545,16 @@ float setCalibrationFactor() {
   float factor = (calibration_weight_values[NUM_POINTS-1]-calibration_weight_values[1])/(atoi(known_calibration_masses[NUM_POINTS-1])-atoi(known_calibration_masses[1]));
 
   #if defined(ESP32)
-    EEPROM.begin(512);
-    EEPROM.put(calVal_eepromAdress, factor);
+    // EEPROM.begin(512);
+    EEPROM.put(calVal_eepromAddress, factor);
     EEPROM.commit();
-    factor = EEPROM.get(calVal_eepromAdress, factor);
+    factor = EEPROM.get(calVal_eepromAddress, factor);
     Serial.println("New calibration factor set to "+ String(factor));
     logMessage(SD, ("New calibration factor set to "+ String(factor)).c_str(),INFO_LEVEL);
   #endif
   
   return factor;
 };
-
-
 
 void logData(fs::FS &fs, String mode, String type, float reading){ 
   /*
@@ -604,7 +613,6 @@ void logData(fs::FS &fs, String mode, String type, float reading){
   }
 };
 
-
 #ifdef OLED_CONNECTED 
   void writeToDisplay(int textSize, char textColour, int cursorX, int cursorY, const char* data_msgToPrint) {
     display.clearDisplay();
@@ -641,10 +649,10 @@ void setup() {
   Serial.begin(9600); // Initialise baud rate with PC
 
   // Harry: This delay helped with reading the whole startup routine on the Serial monitor
-  delay(2000);
+  // delay(2000);
 
   Serial.println("\n*************************");
-  Serial.println("Beginning startup routine.");
+  Serial.println("* Beginning startup routine.");
 
   //----------OLED SETUP------------------------
   #ifdef OLED_CONNECTED
@@ -657,11 +665,8 @@ void setup() {
   #endif
 
   //--------------------RTC SETUP-----------------------
-  // Initialize EEPROM with specified size
-  EEPROM.begin(512);
-
-  // Initialize I2C communication for RTC
-  Wire.begin();
+  EEPROM.begin(512);  // Initialize EEPROM with specified size
+  Wire.begin(); // Initialize I2C communication for RTC
 
   // Check if RTC is connected
   if (!rtc.begin()) {
@@ -669,11 +674,10 @@ void setup() {
     while (1); // Stop if RTC not found
   }
 
-  //RTC EEPROM setup added to ensure that RTC did not reset, to value from last time code uploaded, at each power up.
-  //Can be commented to reset RTC
-
-  // Read the setup flag from EEPROM at address 1
-  byte setupCompleted = EEPROM.read(1);
+  // RTC EEPROM setup added to ensure that RTC did not reset, to value from last time code uploaded, at each power up.
+  // Can be commented to reset RTC
+  // Read the setup flag from EEPROM
+  byte setupCompleted = EEPROM.read(setup_completion_flag_eepromAddress);
 
   // If setup flag is not set, run initial setup
   if (setupCompleted != 1) {
@@ -681,7 +685,7 @@ void setup() {
     rtc.adjust(DateTime(__DATE__, __TIME__)); // Set RTC with compile time
 
     // Set the flag in EEPROM to indicate initial setup is done
-    EEPROM.write(1, 1);
+    EEPROM.write(setup_completion_flag_eepromAddress, 1);
     EEPROM.commit();  // Commit changes to save in EEPROM
   } else {
     Serial.println("RTC setup has already been completed.");
@@ -693,9 +697,8 @@ void setup() {
   sprintf(temp, "%02d:%02d:%02d %02d/%02d/%02d", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year());
   Serial.println(temp);
 
-  Serial.println("Startup routine completed.");
-
-
+  Serial.println("RTC Startup routine completed.");
+  
   //--------------------SD CARD SETUP-----------------------
   // Check if the SD card module is connected
   if(!SD.begin()){
@@ -712,7 +715,7 @@ void setup() {
 
   Serial.println("SD card mounted.");
 
-  // Create the storage file
+  // Create the log file
   updateFilePath(SD, now);
   File file = SD.open(log_file_path, FILE_APPEND);
   if(!file){
@@ -724,27 +727,26 @@ void setup() {
   //----------LOADCELL SETUP------------------------
   LoadCell.begin();
   // LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
-  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
-  LoadCell.start(stabilizingtime, true);
+  unsigned long stabilising_time = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilising time (according to an online resource, not actually tested.)
+  LoadCell.start(stabilising_time, true);
 
   if (LoadCell.getTareTimeoutFlag() || LoadCell.getSignalTimeoutFlag()) {
     logMessage(SD, "Loadcell: Timeout, check MCU->HX711 wiring and pin designations", ERROR_LEVEL);
     Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
     while (1);
   } else {
-    EEPROM.begin(512);
-    EEPROM.get(calVal_eepromAdress, calibration_factor);
+    // EEPROM.begin(512);
+    EEPROM.get(calVal_eepromAddress, calibration_factor);
     if(isnan(calibration_factor)) {
       calibration_factor = 1;
     }
     LoadCell.setCalFactor(calibration_factor); // originally set to a default value and then updated later.
     Serial.println(String("Loadcell: calibration factor set to ") + String(calibration_factor));
   }
-  Serial.println("Loadcell: Startup is complete");
  
   Serial.println("\nReading threshold value is " + String(READING_THRESHOLD));
   logMessage(SD, ("Reading threshold value is set to "+ String(READING_THRESHOLD)).c_str(), INFO_LEVEL);
-  Serial.println("Loadcell startup is complete");
+  Serial.println("Loadcell: Startup is complete");
   logMessage(SD, "Loadcell: startup complete", INFO_LEVEL);
 
   //----------BLE SERVER SETUP------------------------
@@ -797,30 +799,30 @@ void setup() {
     writeToDisplayCentre(2.5, WHITE, "Startup complete");
   #endif
   logMessage(SD, "Startup complete",INFO_LEVEL);
-  Serial.println("Startup complete");
+  Serial.println("* Startup complete");
   Serial.println("*************************");
   // Serial.println(log_buffer);
   
   // Harry: extra error checking for time of RTC at end of Startup
   //Serial.println(temp);
 
-  // Harry: Setting old_hour to an time at Startup ensured that its operation did not escape 1st hour of use when old_hour is set to null.
-  old_hour=now.hour();
+  // Harry: Setting old_hour to a time at Startup ensured that its operation did not escape 1st hour of use when old_hour is set to null.
+  old_hour = now.hour();
 };
 
 void loop() {
   // Harry: Load cell would lose calibration factor when controller connected so to ensure that each reading used calibration factor it is set in each loop
-  // Could be a more effiicient way.
-  LoadCell.setCalFactor(calibration_factor);
+  // Could be a more efficient way.
+  // LoadCell.setCalFactor(calibration_factor);
   
   //Harry: Not sure if necessary but when added it worked and did not want to remove the setting of now each loop
   now = rtc.now();
 
   if(device_connected){ 
-
+    // LoadCell.update(); // Make sure that the HX711 is refreshing.
     String ble_connectVal = pCharacteristic->getValue().c_str(); // BLE: read 
     if(ble_connectVal.equals(ble_disable_msg)){
-      BLEDevice::startAdvertising();
+      BLEDevice::stopAdvertising();
       Serial.println("Stopped advertising");
       delay(200);
       BLEDevice::deinit(true);
@@ -828,30 +830,39 @@ void loop() {
     }
     //----------CONTROLLER MODE------------------------
     if(status == "connected"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Controller connected");
+      #ifdef OLED_CONNECTED
+          writeToDisplayCentre(2.5, WHITE, "Controller connected");
       #endif
       //Serial.println("BLE: Controller connected");
     }else if (status == "tare"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Taring");
+      #ifdef OLED_CONNECTED
+        writeToDisplayCentre(2.5, WHITE, "Taring");
       #endif
       //Serial.println("Controller mode = tarring");
     }else if (status == "calibrate"){
-       #ifdef OLED_CONNECTED
-      writeToDisplayCentre(2.5, WHITE, "Calibrating");
+      #ifdef OLED_CONNECTED
+        writeToDisplayCentre(2.5, WHITE, "Calibrating");
       #endif
       //Serial.println("Controller mode = calibrate");
     }else if(status == "read"){
       // Do nothing because it is reading the scale
     }
+    
     // NOTE: calling all of these functions every iteration of the loop is likely inefficient and there is possibly a better way of doing it but this is the best I can do for the time being.
-    controllerRead(); // checks the BLE read characteristic value
+    String ble_readVal = read_characteristic->getValue().c_str(); // BLE: read characteristic
+    if(ble_readVal != "read"){
+      controllerRead(ble_readVal); // checks the BLE read characteristic value
+    }
     controllerTare(); // checks the BLE tare characteristic value
-    controllerCalibrate(); // checks the BLE calibrate characteristic value
+    String ble_calibrateVal = calibrate_characteristic->getValue().c_str(); // 
+    if(ble_calibrateVal != "calibrate"){
+      controllerCalibrate(ble_calibrateVal); // checks the BLE calibrate characteristic value
+    }
+    //Serial.println("Test: Cal Factor = " + String(LoadCell.getCalFactor()));
 
-  } // End of case where device is connected
+  } // End of case where BLE device is connected
   else if(!device_connected){
+    // Serial.println("Test: Cal Factor = " + String(LoadCell.getCalFactor()));
     //----------STAND-ALONE MODE------------------------
     read(0); // Just run the reading function
 
@@ -863,7 +874,7 @@ void loop() {
       logData(SD, "s", "tare",0);
       Serial.println("Tare complete. IDK what this does");
     }
-  }
+  } // End of case where BLE device is not connected
 
   
 }; // End of main loop
