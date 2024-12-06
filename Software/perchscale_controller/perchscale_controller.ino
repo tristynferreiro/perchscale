@@ -2,7 +2,10 @@
 * This contains the PerchScale controller code. 
 * 
 * Working: 
-*   v1: 29/10/2024, Components: OLED screen Menu {Connect, Disconnect, Calibrate, Tare, Read}, DPAD and BLE client. 
+*   v1 – 29/10/2024; Components: OLED screen Menu {Connect, Disconnect, 
+*         Calibrate, Tare, Read}, DPAD and BLE client. 
+*   v1.1 – 06/12/2024; Added new calibration points for Ground 
+*       Hornbill deployment.
 *
 * Pin connections:
 *   OLED:
@@ -16,7 +19,8 @@
 *   Down Button -> D26
 *   Back Button -> D4
 */
-
+//-----------------CODE SETUP---------------------
+#define BIG_BIRDS // Other option is SMALL_BIRDS
 //------------------INCLUDES------------------------
 // OLED
 #include "U8g2lib.h"
@@ -106,7 +110,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Instantiate
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0); // [full framebuffer, size = 1024 bytes]
 
 // Menu variables
-
 const int NUM_ITEMS = 6; // number of items in the list
 const int MAX_ITEM_LENGTH = 12; // maximum characters for the item name
 
@@ -134,17 +137,30 @@ int button_select_clicked = 0; // same as above
 int button_down_clicked = 0; // same as above
 int button_back_clicked = 0; // same as above
 
-// Calibration weights
+/* Calibration weights
+*   Note: these values need to match the values defined in the scale code.
+*/ 
 int calibrate_weight = 10;
-const int NUM_POINTS = 5; // number of items in the list
-int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights used (in grams)
-  120,
-  150,
-  200,
-  250,
-  300
-};
-
+#ifdef SMALL_BIRDS
+  const int NUM_POINTS = 5; // number of items in the list
+  int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights used (in grams)
+    120,
+    150,
+    200,
+    250,
+    300
+  };
+#endif
+#ifdef BIG_BIRDS
+  const int NUM_POINTS = 5; // number of items in the list
+  int known_calibration_masses [NUM_POINTS] = {  // List of calibration weights used (in grams)
+    2000,
+    2525,
+    3002,
+    3550,
+    4005
+  };
+#endif
 // ************* BLE CLIENT ******************************
 static String rstMsg = "rst";
 static String doneMsg = "done";
@@ -345,11 +361,11 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
 //-----------------------------------------------------
 void setup() {
+  //--------------------SERIAL SETUP-----------------------
+  Serial.begin(115200); // Initialise baud rate with PC
+  Serial.println("Serial connection established.");
   Serial.println("\n*************************");
   Serial.println("Beginning startup routine.");
-  //--------------------SERIAL SETUP-----------------------
-  Serial.begin(9600); // Initialise baud rate with PC
-  Serial.println("Serial connection established.");
   //--------------------OLED SETUP-----------------------
   u8g2.setColorIndex(1);  // set the color to white
   u8g2.begin();

@@ -3,9 +3,10 @@
 *
 * Working: 
 *   v1 - 11/2024; Components: OLED display, BLE server, RTC, SD card, HX711.
-        Used for Yellow-billed Hornbill deployment.
+*        Used for Yellow-billed Hornbill deployment.
 *   v1.1 - 06/12/2024; Bug fix for calibration factor reset when controller
-*       connected. Used for Ground Hornbill deployment.
+*       connected. Added debug mode and new calibration points. Used for Ground 
+*       Hornbill deployment.
 *
 * Pin connections:
 *   SCL of OLED -> SCL (PIN 22) of ESP32
@@ -127,21 +128,19 @@ HX711_ADC LoadCell(HX711_dout, HX711_sck); // instantiate an HX711 object
   float calibration_weight_values [NUM_POINTS]; // used to determine the calibration factor
 #endif
 #ifdef BIG_BIRDS
-  const int NUM_POINTS = 3; // number of items in the list
+  const int NUM_POINTS = 5; // number of items in the list
   const int MAX_ITEM_LENGTH = 5; // maximum characters for the item name
 
   char known_calibration_masses [NUM_POINTS] [MAX_ITEM_LENGTH] = {  // List of calibration weights used (in grams)
       { "2000" },
-      { "4002" },
-      { "6005" }
+      { "2525" },
+      { "3002" },
+      { "3550" },
+      { "4005" }
   };
   float calibration_weight_values [NUM_POINTS]; // used to determine the calibration factor
 #endif
-  
-
-
 bool calibrate_complete_flag = false;
-
 
 // OLED
 #ifdef OLED_CONNECTED
@@ -367,7 +366,7 @@ void read(bool controller_mode){
     reading = LoadCell.getData();
 
     #ifdef DEBUG_MODE
-      Serial.println("Test print (THIS IS NOT ACTUALLY CONSIDERED A READ YET): " + String(reading) + ", raw: " + String(reading*calibration_factor)); // Temporary print
+      Serial.println("Test print (THIS IS NOT ACTUALLY CONSIDERED A READ YET): " + String(reading) + ", cal factor: " + LoadCell.getCalFactor() + ", raw: " + String(reading*LoadCell.getCalFactor())); // Temporary print
     #endif
       
     if((reading>READING_THRESHOLD)){ // If bird is on the scale
